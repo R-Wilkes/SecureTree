@@ -7,7 +7,8 @@
 ScreenClear
 Write-Host "Starting AutoDiagnostics.ps1" -ForegroundColor Red
 Write-Host "SCRIPT WILL NOT MAKE ANY CHANGES, ONLY REPORTS THEM" -ForegroundColor Red
-Start-Sleep $longSleep
+Start-Sleep $shortSleep
+Write-Host "`n`n`n`n"
 
 $hour = (Get-Date).Hour
 $sec = (Get-Date).Second
@@ -25,6 +26,9 @@ $date = Get-Date
 "`nUser Logged in: $curuser" >> $logPath
 "`nComputer Name: $computerName" >> $logPath
 
+# Little helpful status
+Write-Progress -Activity  "All Findings are logged" -Status "Log Location: '$logPath'" 
+
 $current_path = Get-Location
 $hostname = hostname
 
@@ -32,13 +36,6 @@ $hostname = hostname
 # NOTE: Very janky, its barely holding itself together
 # Checks if the computer is on a domain
 if (-not (IsAD)){
-
-    Write-Host "Starting auto user scripts, Make sure the User lists are filled out!" -ForegroundColor Red
-    Start-Sleep $shortSleep
-    Write-Host "To avoid any errors, please don't stop this script mid-way" -ForegroundColor Red
-    Start-Sleep $shortSleep
-    Write-Host "You have $longSleep seconds to abort!" -ForegroundColor Red
-    Start-Sleep $longSleep
 
     # Define paths to user and admin text files
     $userListPath = "$current_path/User_list.txt"
@@ -48,7 +45,7 @@ if (-not (IsAD)){
     $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser"
 
     # Define the password for the users that get changed, will essentially be all of the users
-    $password = "CybersecurityRules3301"
+    $password = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
     # Will just see if the user is in users to not remove
     function UserCheck {
@@ -70,7 +67,8 @@ if (-not (IsAD)){
     # Read the list of users and admins from text files
     $users = Get-Content -Path $userListPath
     $admins = Get-Content -Path $adminListPath
-    "`n Running Users v3" >> $logPath
+    $usersToRemove = @()
+    "`nUsers Needing Changes `n<--------------------------------------------->" >> $logPath
 
     # Create users who are not already created
     foreach ($user in $users) {
@@ -80,7 +78,7 @@ if (-not (IsAD)){
             if ($good -eq $false) {
         
                 Write-Host "Should Create Local User: '$user'" -ForegroundColor Yellow
-                "`n Should create Local Users: $user With password '$password'" >> $logPath
+                "`nShould create Local Users: $user With password '$password'" >> $logPath
                 
             }
         }
@@ -94,7 +92,7 @@ if (-not (IsAD)){
             if ($good -eq $false) {
         
                 Write-Host "Should Create Local admin: '$admin'" -ForegroundColor Yellow
-                "`n Should Create Admin: $admin With password '$password'" >> $logPath
+                "`nShould Create Admin: $admin With password '$password'" >> $logPath
 
             }
         }
@@ -108,7 +106,8 @@ if (-not (IsAD)){
             if ($good -eq $false) {
 
                 Write-Host "Need to Remove: $user" -ForegroundColor Red
-                "`n Remove User: $user" >> $logPath
+                "`nRemove User: $user" >> $logPath
+                $usersToRemove += $user.Name
 
             }
         }
@@ -119,26 +118,27 @@ if (-not (IsAD)){
     foreach ($admin in $allAdmins) {
         $good = UserCheck $admin.Name
         if ($good -eq $false) {
+            if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
     
-            Write-Host "Need to Remove admin perms: $($admin.name)" -ForegroundColor Red
-            "`n Need to Changes Perms to standard for user: $($admin.name)" >> $logPath
-
+                Write-Host "Need to Remove admin perms: $($admin.name)" -ForegroundColor Red
+                "`nNeed to Changes Perms to standard for user: $($admin.name)" >> $logPath
+            
+            }
         }
     }
 
     # Grant administrative privileges to users in the admins list
     foreach ($admin in $admins) {
-        # Write-Host $admins, "AHH", "$admin"
         $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
         if ($existingUser) {
 
             $good = UserCheck $admin
             if ($good -eq $false) {
-                Write-Host $admin
-                Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
-                "`n Change Perms to Admin for user: $admin" >> $logPath
+                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
+                    Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
+                    "`nChange Perms to Admin for user: $admin" >> $logPath
+                }
             }
-        
         }
 
         else {
@@ -152,7 +152,7 @@ if (-not (IsAD)){
         if ($existingUser -and $user -notin $usersToNotRemove) {
 
             Write-Host "Change password for user: '$user'" -ForegroundColor Magenta
-            "`n Change Password for user: $user" >> $logPath
+            "`nChange Password for user: $user" >> $logPath
 
         }
     }
@@ -163,10 +163,13 @@ if (-not (IsAD)){
         if ($existingUser -and $admin -notin $usersToNotRemove) {
 
             Write-Host "Change password for admin '$admin'" -ForegroundColor Magenta
-            "`n Change password for admin: $admin" >> $logPath
+            "`nChange password for admin: $admin" >> $logPath
 
         }
     }
+
+    "`n<--------------------------------------------->`nEnd User Changes" >> $logPath
+
 }
 
 else {
@@ -217,6 +220,9 @@ Get-WmiObject -Class Win32_Product | Select-Object -Property Name
 Write-Host "Press enter to Continue, Screen will CLEAR"
 GetKeyInput -AllowedKeys "`r" | Out-Null 
 ScreenClear
+
+# Removes the banner
+Write-Progress -Activity  "All Findings are logged" -Status "Log Location: '$logPath'" -Completed
 
 # Will run find files as the last things
 if ((Config("find_files"))){

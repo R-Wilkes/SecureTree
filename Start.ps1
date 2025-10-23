@@ -41,7 +41,7 @@ function RunAuto(){
 
         Write-Host "Users or admin list not filled out"
         Write-Host "Press anything to continue once you do that"
-        Start-Sleep $longSleep 
+        Start-Sleep $shortSleep 
         GetKeyInput | Out-Null 
         ScreenClear
 
