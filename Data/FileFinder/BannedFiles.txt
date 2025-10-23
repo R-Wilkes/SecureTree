@@ -1,0 +1,109 @@
+pong
+metasploit-framework
+metasploitframework-latest
+Adaware Web Companion
+Web Companion
+Nmap
+Wireshark
+Metasploit
+Burp Suite
+Aircrack-ng
+John the Ripper
+Hydra
+Nikto
+SQLmap
+Maltego
+Nessus
+Acunetix
+Kali Linux
+BitTorrent
+Torrent
+Parrot Security OS
+OWASP ZAP
+Ettercap
+Cain and Abel
+Reaver
+Social-Engineer Toolkit
+SET
+Wifiphisher
+BeEF
+Browser Exploitation Framework
+Netcat
+OpenVAS
+Armitage
+Cobalt Strike
+Hashcat
+Snort
+Yersinia
+Lynis
+Nexpose
+Arachni
+W3af
+IronWASP
+SQLNinja
+Fiddler
+AppScan
+Netsparker
+WebScarab
+Hping
+Kismet
+Wapiti
+Zed Attack Proxy
+ZAP
+Cain & Abel
+THC-Hydra
+Social-Engineer Toolkit (SET)
+Wifite
+Medusa
+Paros Proxy
+Havij
+Sqlninja
+Sqlsus
+WebInspect
+Retina
+Core Impact
+Immunity Canvas
+Burp Suite Pro
+Nikto2
+Vega
+Grendel-Scan
+Skipfish
+Ratproxy
+Wfuzz
+DirBuster
+Gobuster
+Fierce
+DNSenum
+DNSmap
+DNSRecon
+Sublist3r
+TheHarvester
+Recon-ng
+SpiderFoot
+FOCA
+Shodan
+Censys
+Maltego CE
+OSINT Framework
+SpiderFoot HX
+ReconDog
+Metagoofil
+Datasploit
+Creepy
+Twint
+Sherlock
+Sqlmap
+CCleaner64
+CCleaner
+Cleaner64
+mp3
+mov
+mp4
+avi
+mpg
+mpeg
+flac
+m4a
+flv
+ogg
+

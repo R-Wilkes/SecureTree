@@ -1,0 +1,34 @@
+Start.ps1
+User_Admin_list.txt
+User_list.txt
+FileFinder.psm1
+config.txt
+Auto1.ps1
+FindFiles.ps1
+ErrorLogs.txt
+Readme.md
+SysinternalsSuite.zip
+Autoruns64.exe
+Bginfo64.exe
+Cacheset64.exe
+portmon.exe
+Procmon64.exe
+tcpview64.exe
+revosetup.exe
+FileOutput.txt
+BannedFiles.txt
+BaseFiles.txt
+ExceptionFiles.txt
+Filter.ps1
+Finder.ps1
+FrameBuilder.ps1
+Base Logo.txt
+BaseFiles.txt
+Cicada Logo.txt
+ForeverFirewall.ps1
+FrameBuilder.ps1
+SysinternalsSuite.zip
+FireFox Installer.exe
+ExceptionFolder.txt
+FrameBuilder.psm1
+ExceptionFolder.txt
