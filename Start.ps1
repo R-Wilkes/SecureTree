@@ -831,143 +831,57 @@ else{
         elseif (($choice -eq "4" -and $global:advanceView) -or ($choice -eq "2" -and -not ($global:advanceView))) {
 
             "[" + (Get-CurrentTime) + "] $curuser Entered Program Install" >> $manLog
-            $server = IsServer
 
             While ($True) {
 
                 ScreenClear
                 
                 try{
-
-                    # Shows Avast depending on if you are running windows server or not
-                    if (-not $server){
-
-                        $which = BuildSubOptionFrame(" 1) Install MalwareBytes `n 2) Install Avast `n 3) Install Revo Uninstaller `n 4) Install Chrome `n 5) Install Firefox `n 6) Exit Installers")
-
-                        # MalwareBytes Installer
-                        if ($which -eq "1") {
-
-                            # Malwarebytes Installer
-                            & .\Software\AntiVirus\MBSetup-Windows.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Malwarebytes" >> $manLog
-    
-                        }
-
-                        # Avast Installer
-                        if ($which -eq "2") {
-
-                            # Avast  install
-                            & .\Software\AntiVirus\avast_free_antivirus_setup_online.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Avast" >> $manLog
-                
-                        }
+                        
+                    $which = BuildSubOptionFrame(" 1) Install Revo Uninstaller `n 2) Install Chrome `n 3) Install Firefox `n 4) Exit Installers")
+            
+                    # Revo Installer
+                    if ($which -eq "1") {
 
                         # Revo Installer
-                        if ($which -eq "3") {
+                        & .\Software\Uninstallers\revosetup.exe
 
-                            # Revo Installer
-                            & .\Software\Uninstallers\revosetup.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Revo Uninstaller" >> $manLog
-    
-                        }
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Installed Revo Uninstaller" >> $manLog
 
-                        # Chrome Installer
-                        if ($which -eq "4") {
-
-                            # CHromeInstaller
-                            & .\Software\Browser\ChromeSetup.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Chrome" >> $manLog
-    
-                        }
-
-                        # Firefox Installer
-                        if ($which -eq "5") {
-
-                            # Revo Installer
-                            & ".\Software\Browser\Firefox Installer.exe"
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Firefox" >> $manLog
-    
-                        }
-                        
-                        
-
-                        # Exit
-                        if ($which -eq "6") {
-
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Exited Anti-Virus Install" >> $manLog
-                            break
-    
-                        }
                     }
 
-                    else{
-                        
-                        $which = BuildSubOptionFrame(" 1) Install MalwareBytes `n 2) Install Revo Uninstaller `n 3) Install Chrome `n 4) Install Firefox `n 5) Exit Installers")
-                
-                        # MalwareBytes Installer
-                        if ($which -eq "1") {
+                    # Chrome Installer
+                    if ($which -eq "2") {
 
-                            # Malwarebytes Installer
-                            & .\Software\AntiVirus\MBSetup-Windows.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Malwarebytes" >> $manLog
-    
-                        }
+                        # CHromeInstaller
+                        & .\Software\Browser\ChromeSetup.exe
+
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Installed Chrome" >> $manLog
+
+                    }
+
+                    # Firefox Installer
+                    if ($which -eq "3") {
 
                         # Revo Installer
-                        if ($which -eq "2") {
+                        & ".\Software\Browser\Firefox Installer.exe"
 
-                            # Revo Installer
-                            & .\Software\Uninstallers\revosetup.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Revo Uninstaller" >> $manLog
-    
-                        }
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Installed Firefox" >> $manLog
 
-                        # Chrome Installer
-                        if ($which -eq "3") {
-
-                            # CHromeInstaller
-                            & .\Software\Browser\ChromeSetup.exe
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Chrome" >> $manLog
-    
-                        }
-
-                        # Firefox Installer
-                        if ($which -eq "4") {
-
-                            # Revo Installer
-                            & ".\Software\Browser\Firefox Installer.exe"
-    
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Installed Firefox" >> $manLog
-    
-                        }
-                                                    
-                        # Exit
-                        if ($which -eq "5") {
-
-                            # Manual Log
-                            "[" + (Get-CurrentTime) + "] $curuser Exited Anti-Virus Install" >> $manLog
-                            break
-    
-                        }
                     }
+                                                
+                    # Exit
+                    if ($which -eq "4") {
+
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Exited Install Programs Install" >> $manLog
+                        break
+
+                    }
+                
                 }
                 catch {
                     WriteErrorLog -ErrorRecord $_
