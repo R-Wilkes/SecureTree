@@ -1008,34 +1008,40 @@ else{
 
                 ScreenClear
                 
-                $op = BuildSubOptionFrame(" 1) Run Auto2.bat `n 2) Run Auto1.ps1 `n 3) Run  `n 4) Run `n 5) Run  `n 6) Run `n 7) Exit")
+                $op = BuildSubOptionFrame(" 1) Run AutoDiagnostics.ps1 `n 2) Run AutoFix.ps1 `n 3) Run Policys.ps1 `n 4) Exit")
     
-                # Auto2
+                # AutoDiagnostics
                 if ($op -eq "1") {
 
-                    & .\Auto\Auto2.bat
+                    & .\Auto\AutoDiagnostics\AutoDiagnostics.ps1
 
                     # Manual Log
-                    "[" + (Get-CurrentTime) + "] $curuser Ran Auto2.bat" >> $manLog
+                    "[" + (Get-CurrentTime) + "] $curuser Ran AutoDiagnostics.ps1" >> $manLog
         
                 }
 
-                # Auto1
+                # AutoFix
                 if ($op -eq "2") {
 
-                    & .\Auto\Auto1.ps1
+                    & .\Auto\AutoFix\AutoFix.ps1
 
                     # Manual Log
-                    "[" + (Get-CurrentTime) + "] $curuser Ran Auto1.ps1" >> $manLog
+                    "[" + (Get-CurrentTime) + "] $curuser Ran AutoFix.ps1" >> $manLog
         
                 }
 
-      
+                # Policys
+                if ($op -eq "3") {
 
-    
+                    & .\Auto\AutoFix\Policys.ps1
+
+                    # Manual Log
+                    "[" + (Get-CurrentTime) + "] $curuser Ran Policys.ps1" >> $manLog
+        
+                }
 
                 # Exit
-                if ($op -eq "7") {
+                if ($op -eq "4") {
                     
                     $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Inquire
 

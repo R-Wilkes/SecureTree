@@ -11,15 +11,6 @@ fast_mode = False
 fast_mode_time = 1
 debug_mode = False
 
-## Password policy's
-set_password_policy = True
-min_password_length = 10
-min_password_age = 5
-max_password_age = 90
-unique_password = 6
-lock_out_threshold = 5
-lock_out_duration = 30
-
 ## Auto Scripts
 run_auto_diagnostic = True
 run_auto_fix = Ask
@@ -28,10 +19,19 @@ run_auto_fix = Ask
 find_files = False
 run_winPEAS = Ask
 
-
 ## AutoFix
+set_local_users = Ask
 enable_firewall = Ask
 run_service_config = Ask
 set_registry_keys = Ask
 run_policys = Ask
 run_auto_fix.bat = Ask
+
+## Password policy's
+set_password_policy = True
+min_password_length = 10
+min_password_age = 5
+max_password_age = 90
+unique_password = 6
+lock_out_threshold = 5
+lock_out_duration = 30

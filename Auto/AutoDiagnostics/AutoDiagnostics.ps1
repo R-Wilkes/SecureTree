@@ -38,8 +38,8 @@ if (IsAD) {
     Write-Host "On Active Directory Domain: $((Get-ADDomain).Name)" -ForegroundColor Cyan
 
     # Define paths to user and admin text files
-    $userListPath = "$current_path/UserLists/Domain_Admins.txt"
-    $adminListPath = "$current_path/UserLists/Domain_Users.txt"
+    $userListPath = "$current_path/UserLists/Domain_Users.txt"
+    $adminListPath = "$current_path/UserLists/Domain_Admins.txt"
 
     # Ignore these users (domain format)
     $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
@@ -198,8 +198,8 @@ if (IsAD) {
 if ($True){
 
     # Define paths to user and admin text files
-    $userListPath = "$current_path/UserLists/Local_Admins.txt"
-    $adminListPath = "$current_path/UserLists/Local_Users.txt"
+    $userListPath = "$current_path/UserLists/Local_Users.txt"
+    $adminListPath = "$current_path/UserLists/Local_Admins.txt"
 
     # Ignore these users
     $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
