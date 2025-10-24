@@ -33,13 +33,29 @@ Import-Module -Name "./Data/FileFinder/FileFinder" -Force
 function RunAuto(){
 
     # Get the file properties
-    $UAL = Get-Item -Path ".\User_Admin_list.txt"
-    $UL = Get-Item -Path ".\User_list.txt"
+    $UAL = Get-Item -Path ".\UserLists\Local_Admins.txt"
+    $UL = Get-Item -Path ".\UserLists\Local_Users.txt"
 
     # Will remind you to fill out the auto
     if (($UAL.Length -eq 0 -or $UL.Length -eq 0)) {
 
-        Write-Host "Users or admin list not filled out"
+        Write-Host "Local Users or Local admins list not filled out"
+        Write-Host "Press anything to continue once you do that"
+        Start-Sleep $shortSleep 
+        GetKeyInput | Out-Null 
+        ScreenClear
+
+    }
+
+    # Checks for the domain users
+    # Get the file properties
+    $UAL = Get-Item -Path ".\UserLists\Domain_Admins.txt"
+    $UL = Get-Item -Path ".\UserLists\Domain_Users.txt"
+
+    # Will remind you to fill out the auto
+    if (($UAL.Length -eq 0 -or $UL.Length -eq 0)) {
+
+        Write-Host "Domain users or Domain admins list not filled out"
         Write-Host "Press anything to continue once you do that"
         Start-Sleep $shortSleep 
         GetKeyInput | Out-Null 
