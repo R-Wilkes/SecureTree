@@ -4,7 +4,7 @@
 ScreenClear
 Write-Host "Starting AutoFix.ps1" -ForegroundColor Red
 Write-Host "SCRIPT WILL MAKE CHANGES" -ForegroundColor Red
-Start-Sleep $longSleep
+Start-Sleep $shortSleep
 
 $hour = (Get-Date).Hour
 $sec = (Get-Date).Second
@@ -27,178 +27,418 @@ $hostname = hostname
 
 $allUsersPassword = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
-# Will set users based on the list provided, Machine will be cooked probably
-if ((Config("set_local_users"))){
+# Will set users based on the list provided
+if (-not (IsAD)){
 
-    Write-Host "To avoid any errors, please don't stop this script mid-way" -ForegroundColor Red
-    Start-Sleep $shortSleep
-    Write-Host "You have $longSleep seconds to abort!" -ForegroundColor Red
-    Start-Sleep $longSleep
+    if (Config("set_local_users")){
 
-    # Define paths to user and admin text files
-    $userListPath = "$current_path/UserLists/Local_Users.txt"
-    $adminListPath = "$current_path/UserLists/Local_Admins.txt"
+        Write-Host "Setting local users..."
+        Write-Host "To avoid any errors, please don't stop mid-way" -ForegroundColor Red
+        Start-Sleep $shortSleep
+        Write-Host "You have $longSleep seconds to abort!" -ForegroundColor Red
+        Start-Sleep $longSleep
 
-    # Ignore these users
-    $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+        # Define paths to user and admin text files
+        $userListPath = "$current_path/UserLists/Local_Users.txt"
+        $adminListPath = "$current_path/UserLists/Local_Admins.txt"
 
-    # Will just see if the user is in users to not remove
-    function UserCheck {
-        param (
-            [string]$inputString
-        )
+        # Ignore these users
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
 
-        $inputString = $inputString.replace("$hostname\","")
+        # Will just see if the user is in users to not remove
+        function UserCheck {
+            param (
+                [string]$inputString
+            )
 
-        if ($usersToNotRemove -contains $inputString) {
-            return $true
-        }
+            $inputString = $inputString.replace("$hostname\","")
 
-        else {
-            return $false
-        }
-    }
+            if ($usersToNotRemove -contains $inputString) {
+                return $true
+            }
 
-    # Read the list of users and admins from text files
-    $users = Get-Content -Path $userListPath
-    $admins = Get-Content -Path $adminListPath
-    $usersToRemove = @()
-    "`nLocal Users Changing `n<--------------------------------------------->" >> $logPath
-
-    # Create users who are not already created
-    foreach ($user in $users) {
-        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
-        if (-not $existingUser) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
-
-                $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                New-LocalUser "$user" -Password $np -FullName "$user"
-                Add-LocalGroupMember -Group "Users" -Member "$user"
-
-                Write-Host "Creating Local User: '$user'" -ForegroundColor Yellow
-                "`nCreated Local User: $user With password '$allUsersPassword'" >> $logPath
-                
+            else {
+                return $false
             }
         }
-    }
 
-    # Creates admins
-    foreach ($admin in $admins) {
-        $existingAdmin = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if (-not $existingAdmin) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
+        # Read the list of users and admins from text files
+        $users = Get-Content -Path $userListPath
+        $admins = Get-Content -Path $adminListPath
+        $usersToRemove = @()
+        "`nLocal Users Changing `n<--------------------------------------------->" >> $logPath
 
-                $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                New-LocalUser "$admin" -Password $np -FullName "$admin"
-                Add-LocalGroupMember -Group "Administrators" -Member "$admin"
-        
-                Write-Host "Creating Local admin: '$admin'" -ForegroundColor Yellow
-                "`nCreated Local Admin: $admin With password '$allUsersPassword'" >> $logPath
+        # Create users who are not already created
+        foreach ($user in $users) {
+            $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
+            if (-not $existingUser) {
+                $good = UserCheck $user.Name
+                if ($good -eq $false) {
 
-            }
-        }
-    }
+                    $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                    New-LocalUser "$user" -Password $np -FullName "$user" | Out-Null
+                    Add-LocalGroupMember -Group "Users" -Member "$user" | Out-Null
 
-    # Remove users who are not in the user list
-    $allLocalUsers = Get-LocalUser | Where-Object { $_.Name -notin $users }
-    foreach ($user in $allLocalUsers) {
-        if ($user.Name -notin $admins) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
-
-                if ($user.Name -notlike "*$*"){
-
-                    Remove-LocalUser -Name $user.Name 
-                    Write-Host "Removed Local User: $user" -ForegroundColor Red
-                    "`nRemoved Local User: $user" >> $logPath
-                    $usersToRemove += $user.Name
-
-                }
-                
-                else{
-                    $userToRemove += $user.Name
+                    Write-Host "Creating Local User: '$user'" -ForegroundColor Yellow
+                    "`nCreated Local User: $user With password '$allUsersPassword'" >> $logPath
+                    
                 }
             }
         }
-    }
 
-    # Little error handling
-    try {
-        
-        # Revoke administrative privileges from users not in the admins list
-        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
-        foreach ($admin in $allAdmins) {
-            $good = UserCheck $admin.Name
-            if ($good -eq $false) {
-                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
+        # Creates admins
+        foreach ($admin in $admins) {
+            $existingAdmin = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+            if (-not $existingAdmin) {
+                $good = UserCheck $user.Name
+                if ($good -eq $false) {
 
-                    Remove-LocalGroupMember -Group "Administrators" -Member $admin.Name
-                    Write-Host "Removed admin perms: $($admin.name)" -ForegroundColor Red
-                    "`nChanged Perms to standard for user: $($admin.name)" >> $logPath
-                
-                }
-            }
-        }
-    }
-
-    catch {
-        Write-Host "Unable to get group: Administrators" -ForegroundColor Red
-        "`nUnable to get group: Administrators" >> $logPath
-    }
-
-    # Grant administrative privileges to users in the admins list
-    foreach ($admin in $admins) {
-        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if ($existingUser) {
-
-            $good = UserCheck $admin
-            if ($good -eq $false) {
-                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
-
-                    Add-LocalGroupMember -Group "Administrators" -Member $admin
-                    Write-Host "Added admin perms: $admin" -ForegroundColor Yellow
-                    "`nChanged Perms to Admin for user: $admin" >> $logPath
+                    $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                    New-LocalUser "$admin" -Password $np -FullName "$admin"
+                    Add-LocalGroupMember -Group "Administrators" -Member "$admin"
+            
+                    Write-Host "Creating Local admin: '$admin'" -ForegroundColor Yellow
+                    "`nCreated Local Admin: $admin With password '$allUsersPassword'" >> $logPath
 
                 }
             }
         }
 
-        else {
-            Write-Host "$admin does not exist or is not a local user. (Ignore)"
+        # Remove users who are not in the user list
+        $allLocalUsers = Get-LocalUser | Where-Object { $_.Name -notin $users }
+        foreach ($user in $allLocalUsers) {
+            if ($user.Name -notin $admins) {
+                $good = UserCheck $user.Name
+                if ($good -eq $false) {
+
+                    if ($user.Name -notlike "*$*"){
+
+                        Remove-LocalUser -Name $user.Name 
+                        Write-Host "Removed Local User: $user" -ForegroundColor Red
+                        "`nRemoved Local User: $user" >> $logPath
+                        $usersToRemove += $user.Name
+
+                    }
+                    
+                    else{
+                        $userToRemove += $user.Name
+                    }
+                }
+            }
         }
-    }
 
-    # For each loop to change passwords for users in user_list.txt
-    foreach ($user in $users) {
-        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
-        if ($existingUser -and $user -notin $usersToNotRemove) {
+        # Little error handling
+        try {
+            
+            # Revoke administrative privileges from users not in the admins list
+            $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
+            foreach ($admin in $allAdmins) {
+                $good = UserCheck $admin.Name
+                if ($good -eq $false) {
+                    if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
 
-
-            $newPassword = ConvertTo-SecureString -String "$allUsersPassword" -AsPlainText -Force
-            Set-LocalUser -Name $user -Password $newPassword
-            Write-Host "Changed password for local user: '$user'" -ForegroundColor Magenta
-            "`nChanged Password for Local user: $user" >> $logPath
-
+                        Remove-LocalGroupMember -Group "Administrators" -Member $admin.Name
+                        Write-Host "Removed admin perms: $($admin.name)" -ForegroundColor Red
+                        "`nChanged Perms to standard for user: $($admin.name)" >> $logPath
+                    
+                    }
+                }
+            }
         }
-    }
 
-    # For each loop to change passwords for admins in user_admin_list.txt
-    foreach ($admin in $admins) {
-        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if ($existingUser -and $admin -notin $usersToNotRemove) {
-
-            $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-            Set-LocalUser -Name $admin -Password $newPassword
-            Write-Host "Changed password for Local admin '$admin'" -ForegroundColor Magenta
-            "`nChanged password for Local admin: $admin" >> $logPath
-
+        catch {
+            Write-Host "Unable to get group: Administrators" -ForegroundColor Red
+            "`nUnable to get group: Administrators" >> $logPath
         }
+
+        # Grant administrative privileges to users in the admins list
+        foreach ($admin in $admins) {
+            $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+            if ($existingUser) {
+
+                $good = UserCheck $admin
+                if ($good -eq $false) {
+                    if ($admin.replace("$hostname\","") -notin $usersToRemove){
+
+                        Add-LocalGroupMember -Group "Administrators" -Member $admin
+                        Write-Host "Added admin perms: $admin" -ForegroundColor Yellow
+                        "`nChanged Perms to Admin for user: $admin" >> $logPath
+
+                    }
+                }
+            }
+
+            else {
+                Write-Host "$admin does not exist or is not a local user. (Ignore)"
+            }
+        }
+
+        # For each loop to change passwords for users in user_list.txt
+        foreach ($user in $users) {
+            $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
+            if ($existingUser -and $user -notin $usersToNotRemove) {
+
+
+                $newPassword = ConvertTo-SecureString -String "$allUsersPassword" -AsPlainText -Force
+                Set-LocalUser -Name $user -Password $newPassword
+                Write-Host "Changed password for local user: '$user'" -ForegroundColor Magenta
+                "`nChanged Password for Local user: $user" >> $logPath
+
+            }
+        }
+
+        # For each loop to change passwords for admins in user_admin_list.txt
+        foreach ($admin in $admins) {
+            $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+            if ($existingUser -and $admin -notin $usersToNotRemove) {
+
+                $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                Set-LocalUser -Name $admin -Password $newPassword
+                Write-Host "Changed password for Local admin '$admin'" -ForegroundColor Magenta
+                "`nChanged password for Local admin: $admin" >> $logPath
+
+            }
+        }
+
+        "`n<--------------------------------------------->`nEnd Local User Changes" >> $logPath
+
     }
+}
 
-    "`n<--------------------------------------------->`nEnd Local User Changes" >> $logPath
+# Will set domain users based on the list provided | AI
+if ((IsAD)){
 
+    if (Config("set_domain_users")){
+
+        Write-Host "Setting domain Users..."
+        Write-Host "To avoid any errors, please don't stop mid-way" -ForegroundColor Red
+        Start-Sleep $shortSleep
+        Write-Host "You have $longSleep seconds to abort!" -ForegroundColor Red
+        Start-Sleep $longSleep
+
+        # Define paths to user and admin text files
+        $userListPath = "$current_path/UserLists/Domain_Users.txt"
+        $adminListPath = "$current_path/UserLists/Domain_Admins.txt"
+
+        # Ignore these users (domain format)
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+
+        # Function to check if user should be protected
+        function DomainUserCheck {
+            param (
+                [string]$inputString
+            )
+            
+            # Remove domain prefix if present
+            $cleanName = ($inputString -split "\\")[-1]
+            
+            if ($usersToNotRemove -contains $cleanName) {
+                return $true
+            }
+            else {
+                return $false
+            }
+        }
+
+        # Read the list of users and admins from text files
+        $users = Get-Content -Path $userListPath -ErrorAction SilentlyContinue
+        $admins = Get-Content -Path $adminListPath -ErrorAction SilentlyContinue
+        $usersToRemove = @()
+
+        "`nDomain Users Changing `n<--------------------------------------------->" >> $logPath
+
+        # Get domain info for proper user creation
+        $domain = Get-ADDomain
+        $domainDN = $domain.DistinguishedName
+        $usersOU = "CN=Users,$domainDN"  # Default Users container
+
+        # Create domain users who are not already created
+        foreach ($user in $users) {
+            try {
+                $existingUser = Get-ADUser -Identity $user -ErrorAction Stop
+            }
+            catch {
+                $good = DomainUserCheck $user
+                if ($good -eq $false) {
+                    try {
+                        $securePassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                        New-ADUser -Name $user -SamAccountName $user -UserPrincipalName "$user@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $securePassword -Enabled $true -ChangePasswordAtLogon $false
+                        
+                        Write-Host "Creating Domain User: '$user'" -ForegroundColor Yellow
+                        "`nCreated Domain User: $user With password '$allUsersPassword'" >> $logPath
+                    }
+                    catch {
+                        Write-Host "Failed to create domain user: $user - $($_.Exception.Message)" -ForegroundColor Red
+                        "`nFailed to create domain user: $user - $($_.Exception.Message)" >> $logPath
+                    }
+                }
+            }
+        }
+
+        # Create domain admins
+        foreach ($admin in $admins) {
+            try {
+                $existingAdmin = Get-ADUser -Identity $admin -ErrorAction Stop
+            }
+            catch {
+                $good = DomainUserCheck $admin
+                if ($good -eq $false) {
+                    try {
+                        $securePassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                        New-ADUser -Name $admin -SamAccountName $admin -UserPrincipalName "$admin@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $securePassword -Enabled $true -ChangePasswordAtLogon $false
+                        
+                        # Add to Domain Admins group
+                        Add-ADGroupMember -Identity "Domain Admins" -Members $admin
+                        
+                        Write-Host "Creating Domain Admin: '$admin'" -ForegroundColor Yellow
+                        "`nCreated Domain Admin: $admin With password '$allUsersPassword'" >> $logPath
+                    }
+                    catch {
+                        Write-Host "Failed to create domain admin: $admin - $($_.Exception.Message)" -ForegroundColor Red
+                        "`nFailed to create domain admin: $admin - $($_.Exception.Message)" >> $logPath
+                    }
+                }
+            }
+        }
+
+        # Remove domain users who are not in the user list
+        try {
+            $allDomainUsers = Get-ADUser -Filter * | Where-Object { 
+                $_.Name -notin $users -and $_.Name -notin $admins 
+            }
+            
+            foreach ($user in $allDomainUsers) {
+                $good = DomainUserCheck $user.Name
+                if ($good -eq $false) {
+                    if ($user.Name -notlike "*$*"){
+                        try {
+                            Remove-ADUser -Identity $user.SamAccountName -Confirm:$false
+                            Write-Host "Removed Domain User: $($user.Name)" -ForegroundColor Red
+                            "`nRemoved Domain User: $($user.Name)" >> $logPath
+                            $usersToRemove += $user.Name
+                        }
+                        catch {
+                            Write-Host "Failed to remove domain user: $($user.Name) - $($_.Exception.Message)" -ForegroundColor Red
+                            "`nFailed to remove domain user: $($user.Name) - $($_.Exception.Message)" >> $logPath
+                        }
+                    }
+                    else{
+                        $usersToRemove += $user.Name
+                    }
+                }
+            }
+        }
+        catch {
+            Write-Host "Error getting domain users: $($_.Exception.Message)" -ForegroundColor Red
+            "`nError getting domain users: $($_.Exception.Message)" >> $logPath
+        }
+
+        # Revoke Domain Admin privileges from users not in the admins list
+        try {
+            $domainAdminsGroup = Get-ADGroupMember -Identity "Domain Admins" -ErrorAction Stop
+            
+            foreach ($domainAdmin in $domainAdminsGroup) {
+                $cleanAdminName = ($domainAdmin.Name -split "\\")[-1]
+                if ($cleanAdminName -notin $admins) {
+                    $good = DomainUserCheck $domainAdmin.Name
+                    if ($good -eq $false) {
+                        if ($cleanAdminName -notin $usersToRemove){
+                            try {
+                                Remove-ADGroupMember -Identity "Domain Admins" -Members $domainAdmin.SamAccountName -Confirm:$false
+                                Write-Host "Removed Domain Admin perms: $($domainAdmin.Name)" -ForegroundColor Red
+                                "`nRemoved from Domain Admins: $($domainAdmin.Name)" >> $logPath
+                            }
+                            catch {
+                                Write-Host "Failed to remove Domain Admin perms: $($domainAdmin.Name) - $($_.Exception.Message)" -ForegroundColor Red
+                                "`nFailed to remove from Domain Admins: $($domainAdmin.Name) - $($_.Exception.Message)" >> $logPath
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch {
+            Write-Host "Error checking Domain Admins group: $($_.Exception.Message)" -ForegroundColor Red
+            "`nError checking Domain Admins group: $($_.Exception.Message)" >> $logPath
+        }
+
+        # Grant Domain Admin privileges to users in the admins list
+        foreach ($admin in $admins) {
+            try {
+                $existingUser = Get-ADUser -Identity $admin -ErrorAction Stop
+                $good = DomainUserCheck $admin
+                if ($good -eq $false) {
+                    $cleanAdminName = ($admin -split "\\")[-1]
+                    if ($cleanAdminName -notin $usersToRemove){
+                        try {
+                            # Check if already in Domain Admins
+                            $isDomainAdmin = Get-ADGroupMember -Identity "Domain Admins" | Where-Object { $_.SamAccountName -eq $admin }
+                            
+                            if (-not $isDomainAdmin) {
+                                Add-ADGroupMember -Identity "Domain Admins" -Members $admin
+                                Write-Host "Added Domain Admin perms: $admin" -ForegroundColor Yellow
+                                "`nAdded to Domain Admins: $admin" >> $logPath
+                            }
+                        }
+                        catch {
+                            Write-Host "Failed to add Domain Admin perms: $admin - $($_.Exception.Message)" -ForegroundColor Red
+                            "`nFailed to add to Domain Admins: $admin - $($_.Exception.Message)" >> $logPath
+                        }
+                    }
+                }
+            }
+            catch {
+                Write-Host "$admin does not exist as a domain user. (Ignore if intentional)" -ForegroundColor Gray
+            }
+        }
+
+        # Change passwords for domain users in user_list.txt
+        foreach ($user in $users) {
+            try {
+                $existingUser = Get-ADUser -Identity $user -ErrorAction Stop
+                if ($user -notin $usersToNotRemove) {
+                    try {
+                        $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                        Set-ADAccountPassword -Identity $user -NewPassword $newPassword -Reset
+                        Write-Host "Changed password for domain user: '$user'" -ForegroundColor Magenta
+                        "`nChanged Password for Domain user: $user" >> $logPath
+                    }
+                    catch {
+                        Write-Host "Failed to change password for domain user: $user - $($_.Exception.Message)" -ForegroundColor Red
+                        "`nFailed to change password for domain user: $user - $($_.Exception.Message)" >> $logPath
+                    }
+                }
+            }
+            catch {
+                # User doesn't exist, already handled above
+            }
+        }
+
+        # Change passwords for domain admins in admin_list.txt
+        foreach ($admin in $admins) {
+            try {
+                $existingUser = Get-ADUser -Identity $admin -ErrorAction Stop
+                if ($admin -notin $usersToNotRemove) {
+                    try {
+                        $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
+                        Set-ADAccountPassword -Identity $admin -NewPassword $newPassword -Reset
+                        Write-Host "Changed password for Domain admin '$admin'" -ForegroundColor Magenta
+                        "`nChanged password for Domain admin: $admin" >> $logPath
+                    }
+                    catch {
+                        Write-Host "Failed to change password for domain admin: $admin - $($_.Exception.Message)" -ForegroundColor Red
+                        "`nFailed to change password for domain admin: $admin - $($_.Exception.Message)" >> $logPath
+                    }
+                }
+            }
+            catch {
+                # Admin doesn't exist, already handled above
+            }
+        }
+
+        "`n<--------------------------------------------->`nEnd Domain User Changes" >> $logPath
+
+    }
 }
 
 # Enables all of the firewall rules I have stolen

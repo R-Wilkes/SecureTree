@@ -31,7 +31,157 @@ $hostname = hostname
 
 $allUsersPassword = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
-# All AI, just revamped my local users | AI
+# Looks for Local users, only works if not on AD
+if (-not (IsAD)){
+
+    # Define paths to user and admin text files
+    $userListPath = "$current_path/UserLists/Local_Users.txt"
+    $adminListPath = "$current_path/UserLists/Local_Admins.txt"
+
+    # Ignore these users
+    $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+
+    # Will just see if the user is in users to not remove
+    function UserCheck {
+        param (
+            [string]$inputString
+        )
+
+        $inputString = $inputString.replace("$hostname\","")
+
+        if ($usersToNotRemove -contains $inputString) {
+            return $true
+        }
+
+        else {
+            return $false
+        }
+    }
+
+    # Read the list of users and admins from text files
+    $users = Get-Content -Path $userListPath
+    $admins = Get-Content -Path $adminListPath
+    $usersToRemove = @()
+    "`nUsers Needing Changes `n<--------------------------------------------->" >> $logPath
+
+    # Create users who are not already created
+    foreach ($user in $users) {
+        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
+        if (-not $existingUser) {
+            $good = UserCheck $user.Name
+            if ($good -eq $false) {
+        
+                Write-Host "Should Create Local User: '$user'" -ForegroundColor Yellow
+                "`nShould create Local User: $user With password '$allUsersPassword'" >> $logPath
+                
+            }
+        }
+    }
+
+    # Creates admins
+    foreach ($admin in $admins) {
+        $existingAdmin = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+        if (-not $existingAdmin) {
+            $good = UserCheck $user.Name
+            if ($good -eq $false) {
+        
+                Write-Host "Should Create Local admin: '$admin'" -ForegroundColor Yellow
+                "`nShould Create Local Admin: $admin With password '$allUsersPassword'" >> $logPath
+
+            }
+        }
+    }
+
+    # Remove users who are not in the user list
+    $allLocalUsers = Get-LocalUser | Where-Object { $_.Name -notin $users }
+    foreach ($user in $allLocalUsers) {
+        if ($user.Name -notin $admins) {
+            $good = UserCheck $user.Name
+            if ($good -eq $false) {
+
+                if ($user.Name -notlike "*$*"){
+                    Write-Host "Need to Remove Local User: $user" -ForegroundColor Red
+                    "`nRemove Local User: $user" >> $logPath
+                    $usersToRemove += $user.Name
+                }
+                
+                else{
+                    $userToRemove += $user.Name
+                }
+
+            }
+        }
+    }
+
+    # Little error handling
+    try {
+        
+        # Revoke administrative privileges from users not in the admins list
+        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
+        foreach ($admin in $allAdmins) {
+            $good = UserCheck $admin.Name
+            if ($good -eq $false) {
+                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
+        
+                    Write-Host "Need to Remove admin perms: $($admin.name)" -ForegroundColor Red
+                    "`nNeed to Changes Perms to standard for user: $($admin.name)" >> $logPath
+                
+                }
+            }
+        }
+    }
+
+    catch {
+        Write-Host "Unable to get group: Administrators" -ForegroundColor Red
+        "`nUnable to get group: Administrators" >> $logPath
+    }
+
+    # Grant administrative privileges to users in the admins list
+    foreach ($admin in $admins) {
+        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+        if ($existingUser) {
+
+            $good = UserCheck $admin
+            if ($good -eq $false) {
+                if ($admin.replace("$hostname\","") -notin $usersToRemove){
+                    Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
+                    "`nChange Perms to Admin for user: $admin" >> $logPath
+                }
+            }
+        }
+
+        else {
+            Write-Host "$admin does not exist or is not a local user. (Ignore)"
+        }
+    }
+
+    # For each loop to change passwords for users in user_list.txt
+    foreach ($user in $users) {
+        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
+        if ($existingUser -and $user -notin $usersToNotRemove) {
+
+            Write-Host "Change password for local user: '$user'" -ForegroundColor Magenta
+            "`nChange Password for Local user: $user" >> $logPath
+
+        }
+    }
+
+    # For each loop to change passwords for admins in user_admin_list.txt
+    foreach ($admin in $admins) {
+        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+        if ($existingUser -and $admin -notin $usersToNotRemove) {
+
+            Write-Host "Change password for Local admin '$admin'" -ForegroundColor Magenta
+            "`nChange password for Local admin: $admin" >> $logPath
+
+        }
+    }
+
+    "`n<--------------------------------------------->`nEnd User Changes" >> $logPath
+
+}
+
+# All AI, just revamped my local users, only works for AD users | AI
 if (IsAD) {
 
     "`nActive Directory: $((Get-ADDomain).Name)" >> $logPath
@@ -191,157 +341,6 @@ if (IsAD) {
     }
 
     "`n<--------------------------------------------->`nEnd Domain User Changes" >> $logPath
-}
-
-# NOTE: Very janky, its barely holding itself together
-# If Statement is here for minimizing the code in VScode
-if ($True){
-
-    # Define paths to user and admin text files
-    $userListPath = "$current_path/UserLists/Local_Users.txt"
-    $adminListPath = "$current_path/UserLists/Local_Admins.txt"
-
-    # Ignore these users
-    $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
-
-    # Will just see if the user is in users to not remove
-    function UserCheck {
-        param (
-            [string]$inputString
-        )
-
-        $inputString = $inputString.replace("$hostname\","")
-
-        if ($usersToNotRemove -contains $inputString) {
-            return $true
-        }
-
-        else {
-            return $false
-        }
-    }
-
-    # Read the list of users and admins from text files
-    $users = Get-Content -Path $userListPath
-    $admins = Get-Content -Path $adminListPath
-    $usersToRemove = @()
-    "`nUsers Needing Changes `n<--------------------------------------------->" >> $logPath
-
-    # Create users who are not already created
-    foreach ($user in $users) {
-        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
-        if (-not $existingUser) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
-        
-                Write-Host "Should Create Local User: '$user'" -ForegroundColor Yellow
-                "`nShould create Local User: $user With password '$allUsersPassword'" >> $logPath
-                
-            }
-        }
-    }
-
-    # Creates admins
-    foreach ($admin in $admins) {
-        $existingAdmin = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if (-not $existingAdmin) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
-        
-                Write-Host "Should Create Local admin: '$admin'" -ForegroundColor Yellow
-                "`nShould Create Local Admin: $admin With password '$allUsersPassword'" >> $logPath
-
-            }
-        }
-    }
-
-    # Remove users who are not in the user list
-    $allLocalUsers = Get-LocalUser | Where-Object { $_.Name -notin $users }
-    foreach ($user in $allLocalUsers) {
-        if ($user.Name -notin $admins) {
-            $good = UserCheck $user.Name
-            if ($good -eq $false) {
-
-                if ($user.Name -notlike "*$*"){
-                    Write-Host "Need to Remove Local User: $user" -ForegroundColor Red
-                    "`nRemove Local User: $user" >> $logPath
-                    $usersToRemove += $user.Name
-                }
-                
-                else{
-                    $userToRemove += $user.Name
-                }
-
-            }
-        }
-    }
-
-    # Little error handling
-    try {
-        
-        # Revoke administrative privileges from users not in the admins list
-        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
-        foreach ($admin in $allAdmins) {
-            $good = UserCheck $admin.Name
-            if ($good -eq $false) {
-                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
-        
-                    Write-Host "Need to Remove admin perms: $($admin.name)" -ForegroundColor Red
-                    "`nNeed to Changes Perms to standard for user: $($admin.name)" >> $logPath
-                
-                }
-            }
-        }
-    }
-
-    catch {
-        Write-Host "Unable to get group: Administrators" -ForegroundColor Red
-        "`nUnable to get group: Administrators" >> $logPath
-    }
-
-    # Grant administrative privileges to users in the admins list
-    foreach ($admin in $admins) {
-        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if ($existingUser) {
-
-            $good = UserCheck $admin
-            if ($good -eq $false) {
-                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
-                    Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
-                    "`nChange Perms to Admin for user: $admin" >> $logPath
-                }
-            }
-        }
-
-        else {
-            Write-Host "$admin does not exist or is not a local user. (Ignore)"
-        }
-    }
-
-    # For each loop to change passwords for users in user_list.txt
-    foreach ($user in $users) {
-        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
-        if ($existingUser -and $user -notin $usersToNotRemove) {
-
-            Write-Host "Change password for local user: '$user'" -ForegroundColor Magenta
-            "`nChange Password for Local user: $user" >> $logPath
-
-        }
-    }
-
-    # For each loop to change passwords for admins in user_admin_list.txt
-    foreach ($admin in $admins) {
-        $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
-        if ($existingUser -and $admin -notin $usersToNotRemove) {
-
-            Write-Host "Change password for Local admin '$admin'" -ForegroundColor Magenta
-            "`nChange password for Local admin: $admin" >> $logPath
-
-        }
-    }
-
-    "`n<--------------------------------------------->`nEnd User Changes" >> $logPath
-
 }
 
 # Check if Guest account is enabled

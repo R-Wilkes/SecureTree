@@ -21,14 +21,14 @@ run_winPEAS = Ask
 
 ## AutoFix
 set_local_users = Ask
+set_domain_users = Ask
 enable_firewall = Ask
 run_service_config = Ask
 set_registry_keys = Ask
 run_policys = Ask
-run_auto_fix.bat = Ask
 
 ## Password policy's
-set_password_policy = True
+set_password_policy = Ask
 min_password_length = 10
 min_password_age = 5
 max_password_age = 90

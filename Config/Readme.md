@@ -49,6 +49,9 @@
 - Sets local users based on the users defined in the local_admins/users files <br>
 - WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
 
+### set_domain_users (True, False, Ask)
+- Sets domain users based on the users defined in the domain admins/users files <br>
+- WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
 ### enable_firewall (True, False, Ask)
 - Enables the firewall with a bunch of rules set <br>
 - Most deadly, could block a needed port <br>
@@ -64,11 +67,6 @@
 - Sets a lot of policys that are generally for security <br>
 - Will only run if Auto Fix is true <br>
 - WARNING: This will break your computer somewhere, go for it anyway <br>
-
-### run_auto_fix.bat (True, False, Ask)
-- Sets a bunch of stuff, reg keys, disables guest account, stuff like that <br>
-- Will only run if Auto Fix is true <br>
-- WARNING: This will break your computer everywhere <br>
 
 ## Password Policy's
 
