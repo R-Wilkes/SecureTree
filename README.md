@@ -2,13 +2,86 @@
 
 - This script is meant to be useful in the IRSec competitions
 - Its the daughter script of Cyberpatriot Script (Hopefully the successor)
-- Should do a lot of the things the parent script did, but there are different things needing to be done for each comp, so im moving it to a new script
-- Also that this scrip has to be public
+
+- THIS REPO WILL BE PUBLIC ONLY DURING THE COMPETITION, AND WILL BECOME PRIVATE WHEN NOT DOING COMP
 
 # IRSec
 - Its a blue teaming competitions, similar to Cyberpatriot
 - Difference is thats its more advance, lots more machines, and red teamer's are actively trying to break it
 
+## Running the Start.ps1
+
+### Starting
+Run as administrator Powershell terminal <br>
+```
+.\Start.ps1
+```
+
+### Execution Policy
+
+By default windows does not allow unauthorized scripts to run, to change this run this command in the powershell terminal <br>
+Run this command before trying to run the Start.ps1 <br>
+```
+Set-ExecutionPolicy bypass
+```
+
+# TIPS
+
+fast_mode will allow the script to go faster, can also set the time of sleep statements <br>
+
+debug_mode will make screen not clear, All errors become Inquire <br>
+
+Default error handling is set to Stop <br>
+
+If Manually Editing Users and changing names, don't use any number or special characters <br>
+
+
+# Config
+
+## Overview
+
+There is a config file located in the Config folder that will let you set certain things for the auto script to do<br>
+Mainly there so you can get a little bit more efficiency out of this script<br>
+The readme for the config is in the config folder<br>
+
+## Config Information
+
+Information on what the settings do in the config can be found [Here](Config/Readme.md "Config Settings")
+
+# Users
+
+User files are located in ./UserLists <br>
+Fill out the files before starting the script <br>
+Used to accurately report/make changes when dealing with users on the machine <br>
+
+## Local Users
+These are users that only get set if the machine is NOT part of AD <br>
+
+- Set local users in the Local_Users.txt
+- Set local admins in the Local_Admins.txt
+
+## Domain Users
+These are users that only get set if the machine IS apart of AD <br>
+
+- Set domain users in the Domain_Users.txt
+- Set domain admins in the Domain_Admins.txt
+
+
+# Software
+
+The files located in the software are listed below <br>
+
+Not allowed to enable/install any sort of Anti-Virus <br>
+
+-Firefox Installer <br>
+-Chrome Installer <br>
+-Sysinternals <br>
+-RevoUninstaller Installer <br>
+
 # WARNINGS
-- ONLY meant for use by authorized users and on machines in the IRSec competitions
-- NOT RESPONSIBLE FOR ANY DAMAGE CAUSED
+
+The creator of this glorious script is not responsible for the destruction of your IRSec machine or ANY machine this script runs on <br>
+
+ONLY meant for use by authorized users and on machines in the IRSec competitions <br>
+
+RUN THIS SCRIPT AT YOUR OWN DISCRETION! <br>
