@@ -3,12 +3,41 @@
 
 # Must make sure all group logging is on, Red team def turns that off
 
+# Needed to run properly
+# -------------------------------------
+$global:rootPath = $env:IRSec_RootPath
+Set-Location -Path "$rootPath"
+
+# Imports the functions needed
+Import-Module -Name "./Data/CommonFunctions/CommonFunctions"
+
+# Set as global variables in the new process
+$global:version = $env:IRSec_Version
+$global:curuser = $env:IRSec_CurUser
+$global:computerName = $env:IRSec_ComputerName
+# -------------------------------------
+
 # This is AI, lots of prompting tho | AI
 function Start-DomainLogonMonitor {
     param(
         [int]$RefreshInterval = 2  # Check every 1 second
     )
-    
+
+    $hour = (Get-Date).Hour
+    $sec = (Get-Date).Second
+    $min = (Get-Date).Minute
+
+    $logPath = "./Logs/UserMonitorLog-$hour-$min-$sec.txt"
+    CreatePath -DirectoryPath $logPath -Type "File"
+
+    $date = Get-Date 
+    "IRSec UserMonitor Log" >> $logPath
+    "`nWritten On: $date" >> $logPath
+    "`nProgram Version: $version" >> $logPath 
+    "`nPowershell Version: $($PSVersionTable.PSVersion)" >> $logPath
+    "`nUser Logged in: $curuser" >> $logPath
+    "`nComputer Name: $computerName`n`n`n" >> $logPath
+        
     Write-Host "Starting real-time domain logon monitor..." -ForegroundColor Green
     Write-Host "Press Ctrl+C to stop monitoring`n" -ForegroundColor Yellow
     
@@ -36,7 +65,8 @@ function Start-DomainLogonMonitor {
         $allAdmins = $allAdmins | Sort-Object -Unique
         
         Write-Host "Loaded $($allADUsers.Count) AD users and $($allAdmins.Count) admin accounts" -ForegroundColor Green
-        
+        "Loaded $($allADUsers.Count) AD users and $($allAdmins.Count) admin accounts" >> $logPath
+
     }
     catch {
         Write-Error "Failed to get domain controllers or AD users: $($_.Exception.Message)"
@@ -151,6 +181,9 @@ function Start-DomainLogonMonitor {
                                     $color = if ($isAdmin) { 'Magenta' } else { 'Green' }
                                     $message = "[$($localEvent.TimeCreated)] LOGIN $statusText - DC: $dc - $userType $domain\$username ($logonTypeText)$sourceText$workstationText"
                                     Write-Host $message -ForegroundColor $color
+
+                                    $message >> $logPath
+
                                     $totalEvents++
                                     $totalLogins++
                                 }
@@ -204,6 +237,7 @@ function Start-DomainLogonMonitor {
                                 
                                 $message = "[$($localEvent.TimeCreated)] $alertPrefix - DC: $dc - $userType $domain\$username ($logonTypeText)$sourceText$workstationText - $reasonText"
                                 Write-Host $message -ForegroundColor $color
+                                $message >> $logPath
                                 $totalEvents++
                                 $totalFailures++
                             }
@@ -227,6 +261,7 @@ function Start-DomainLogonMonitor {
                                 
                                 $message = "[$($localEvent.TimeCreated)] $alertPrefix - DC: $dc - $userType $domain\$username$sourceText$workstationText - $kerberosReason"
                                 Write-Host $message -ForegroundColor $color
+                                $message >> $logPath
                                 $totalEvents++
                                 $totalKerberos++
                             }
@@ -237,6 +272,7 @@ function Start-DomainLogonMonitor {
                                     $color = 'Yellow'
                                     $message = "[$($localEvent.TimeCreated)] $statusText - DC: $dc - $userType $domain\$username ($logonTypeText)$workstationText"
                                     Write-Host $message -ForegroundColor $color
+                                    $message >> $logPath
                                     $totalEvents++
                                 }
                             }
@@ -247,6 +283,7 @@ function Start-DomainLogonMonitor {
                                     $color = 'Cyan'
                                     $message = "[$($localEvent.TimeCreated)] $statusText - DC: $dc - $userType $domain\$username$workstationText"
                                     Write-Host $message -ForegroundColor $color
+                                    $message >> $logPath
                                     $totalEvents++
                                 }
                             }

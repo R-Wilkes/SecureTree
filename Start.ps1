@@ -95,6 +95,16 @@ $global:longSleep = 5
 # Temp Data Directory
 $global:tempData = "./Data/TempData"
 $global:tempData | Out-Null
+
+$global:rootPath = "$PSScriptRoot"
+
+
+# Messing with environment variables, sessions specific, not user
+$env:IRSec_Version = $version
+$env:IRSec_CurUser = $curuser
+$env:IRSec_ComputerName = $computerName
+$env:IRSec_RootPath = $rootPath
+
 # -----------------------------------------
 
 
