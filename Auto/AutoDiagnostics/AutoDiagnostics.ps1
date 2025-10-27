@@ -348,14 +348,14 @@ $guest = Get-LocalUser -Name "Guest"
 if ($guest.Enabled) {
 
     Write-Host "Guest account is ENABLED" -ForegroundColor Red
-    "`nGuest account is ENABLED" >> $logPath
+    "`nGuest account is ENABLED (BAD)" >> $logPath
 
 } 
 
 else {
 
     Write-Host "Guest account is disabled" -ForegroundColor Green
-    "`nGuest account is DISABLED" >> $logPath
+    "`nGuest account is DISABLED (GOOD)" >> $logPath
 
 }
 
@@ -364,14 +364,24 @@ $smbV1 = (Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol).State
 if ($smbV1 -ne "Disabled"){
 
     Write-Host "SMBV1 is enabled" -ForegroundColor Red
-    "`nSMBV1 is enabled" >> $logPath
+    "`nSMBV1 is enabled (BAD)" >> $logPath
 
 }
 
 else{
 
     Write-Host "SMBV1 is disabled" -ForegroundColor Green
-    "`nSMBV1 is disabled" >> $logPath
+    "`nSMBV1 is disabled (GOOD)" >> $logPath
+
+}
+
+# Opens new terminal for logging monitoring
+if ((IsDC)){
+
+    "`nStarted Accounts Log Monitoring" >> $logPath
+
+    # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "$current_path\Auto\AutoDiagnostics\LoginMonitoring.ps1"
 
 }
 

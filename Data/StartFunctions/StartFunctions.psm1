@@ -111,6 +111,18 @@ function ADInfo{
     }
 }
 
+# Checks if its a Domain Controller | AI
+function IsDC{
+    try {
+        $computerSystem = Get-WmiObject -Class Win32_ComputerSystem
+        return ($computerSystem.DomainRole -eq 4 -or $computerSystem.DomainRole -eq 5)
+        # 4 = Backup Domain Controller, 5 = Primary Domain Controller
+    }
+    catch {
+        return $false
+    }
+}
+
 # Used for the screen to make sure all the info is correct
 function WindowsVersionInfo{
 
