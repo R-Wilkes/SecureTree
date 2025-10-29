@@ -325,3 +325,93 @@ function PromptAutoMode{
     }
 }
 
+# Returns true if passes the policy, false if not | AI
+function PassesPasswordPolicy {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TestPass
+    )
+    
+    try {
+        # Get current password policy
+        if ((Get-WmiObject -Class Win32_ComputerSystem).DomainRole -ge 4) {
+            # Domain Controller - get domain password policy
+            $policy = Get-ADDefaultDomainPasswordPolicy
+            $minLength = $policy.MinPasswordLength
+            $complexityEnabled = $policy.ComplexityEnabled
+            $minAge = $policy.MinPasswordAge.Days
+            $maxAge = $policy.MaxPasswordAge.Days
+
+            $minAge | Out-Null
+            $maxAge | Out-Null
+
+            
+        } else {
+            # Standalone machine - get local password policy
+            $secpol = secedit /export /cfg "$env:TEMP\secpol.cfg" 2>$null
+            $secpol | Out-Null
+            $policyContent = Get-Content "$env:TEMP\secpol.cfg" -ErrorAction SilentlyContinue
+            
+            # Parse local security policy
+            $minLength = 8  # Default
+            $complexityEnabled = $true  # Default
+            
+            foreach ($line in $policyContent) {
+                if ($line -match "MinimumPasswordLength = (\d+)") {
+                    $minLength = [int]$matches[1]
+                }
+                if ($line -match "PasswordComplexity = (\d+)") {
+                    $complexityEnabled = [bool][int]$matches[1]
+                }
+            }
+            
+            # Clean up temp file
+            Remove-Item "$env:TEMP\secpol.cfg" -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Check minimum length
+        if ($TestPass.Length -lt $minLength) {
+            return $false
+        }
+        
+        # Check complexity requirements if enabled
+        if ($complexityEnabled) {
+            $hasUpper = $TestPass -cmatch '[A-Z]'
+            $hasLower = $TestPass -cmatch '[a-z]'
+            $hasDigit = $TestPass -cmatch '[0-9]'
+            $hasSpecial = $TestPass -cmatch '[^A-Za-z0-9]'
+            
+            # Must meet 3 of 4 complexity requirements
+            $complexityCount = 0
+            if ($hasUpper) { $complexityCount++ }
+            if ($hasLower) { $complexityCount++ }
+            if ($hasDigit) { $complexityCount++ }
+            if ($hasSpecial) { $complexityCount++ }
+            
+            if ($complexityCount -lt 3) {
+                return $false
+            }
+        }
+        
+        # Check for username in password (if we can get current username)
+        $currentUser = $env:USERNAME
+        if ($TestPass -like "*$currentUser*" -and $currentUser.Length -gt 2) {
+            return $false
+        }
+        
+        # All checks passed
+        return $true
+        
+    } catch {
+        # If we can't determine policy, use safe defaults
+        if ($TestPass.Length -ge 8 -and 
+            $TestPass -cmatch '[A-Z]' -and 
+            $TestPass -cmatch '[a-z]' -and 
+            $TestPass -cmatch '[0-9]' -and 
+            $TestPass -cmatch '[^A-Za-z0-9]') {
+            return $true
+        }
+        return $false
+    }
+}
+

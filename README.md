@@ -66,6 +66,13 @@ These are users that only get set if the machine IS apart of AD <br>
 - Set domain users in the Domain_Users.txt
 - Set domain admins in the Domain_Admins.txt
 
+## Manual Mode
+
+Can also set users from the manual mode menu <br>
+Will show two different menus depending if on AD <br>
+Lets you do simple configuration stuff from the terminal <br>
+Can also just do it using the default user GUI on windows <br>
+
 
 # Software
 
