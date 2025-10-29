@@ -1261,6 +1261,7 @@ else{
 
             ScreenClear
             Write-Host "Don't blow up your machine"
+            Write-Host "GPO are set from the Domain Controller, those will be manual set until I find a way to import them without giving my security audits away"
             Write-Host "Some registry Keys can not be set via Script, I don't know why, so you have to do it manually"
             Write-Host "Set SMB protocol to version 2, cause version 1 has Eternal blue vulnerability"
             Read-Host -Prompt "Press enter to exit"
@@ -1988,8 +1989,98 @@ else{
             }
         }
 
+        # Some domain controller menu
+        elseif (($choice -eq "7" -and -not ($global:advanceView))){
+
+            if ((IsDC)){
+
+                "[" + (Get-CurrentTime) + "] $curuser Entered DC Menu" >> $manLog
+                
+                While ($true){
+                
+                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Exit")
+                    
+                    # invoke GPO update on selected computers | AI
+                    if ($choice -eq "1"){
+
+                        "[" + (Get-CurrentTime) + "] $curuser Entered DC GPO Invoke Menu" >> $manLog
+                        ScreenClear
+
+                        try {
+                            $computers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
+                        }
+                        catch {
+                            BuildSubTerminalText -Text "Failed to query domain computers"
+                            WriteErrorLog -ErrorRecord $_
+                            continue
+                        }
+
+                        if (-not $computers -or $computers.Count -eq 0) {
+                            BuildSubTerminalText -Text "No domain computers found"
+                            continue
+                        }
+
+                        # Add convenience options
+                        $menuArray = $computers + @("All Domain Computers")
+                        $menuString = FormatArrayToString -Array $menuArray
+                        $sel = BuildSubOptionFrame($menuString)
+
+                        # Exit
+                        if ($sel -eq ($menuArray.Length + 1)) {
+                            # If user picked Cancel (last item), go back to DC menu
+                            continue
+                        }
+
+                        # Determine targets
+                        if ($sel -eq ($computers.Length + 1)) {
+                            $targets = $computers
+                        }
+                        else {
+                            $targets = @($computers[$sel - 1])
+                        }
+
+                        # Confirm before running
+                        if (-not (2FA -Message "Run GPO update on $($targets.Count) computer(s)?")) {
+                            "[" + (Get-CurrentTime) + "] Declined GPO Update" >> $manLog
+                            continue
+                        }
+
+                        # Ensure GroupPolicy module is available
+                        if (-not (Get-Module -ListAvailable -Name GroupPolicy)) {
+                            try { Import-Module GroupPolicy -ErrorAction Stop } catch { WriteErrorLog -ErrorRecord $_; BuildSubTerminalText -Text "GroupPolicy module not available"; continue }
+                        }
+
+                        foreach ($t in $targets) {
+                            try {
+                                Invoke-GPUpdate -Computer $t -RandomDelayInMinutes 0 -Force -ErrorAction Stop
+                                "[" + (Get-CurrentTime) + "] $curuser Invoked GPO Update on $t" >> $manLog
+                            }
+                            catch {
+                                WriteErrorLog -ErrorRecord $_
+                            }
+                        }
+
+                        BuildSubTerminalText -Text "GPO update initiated on selected computer(s)."
+                    }
+
+                    # Exits
+                    if ($choice -eq "2"){
+                        "[" + (Get-CurrentTime) + "] $curuser Exited DC GPO Menu" >> $manLog
+                        break
+                    }
+                }
+            }
+
+            else{
+
+                BuildSubTerminalText("Your not on a Domain Controller")
+                "[" + (Get-CurrentTime) + "] $curuser is not on a domain controller" >> $manLog
+
+            }
+        }
+
         # Swaps the view of the terminal
-        elseif (($choice -eq "11" -and $global:advanceView) -or ($choice -eq "7" -and -not ($global:advanceView))) {
+        elseif (($choice -eq "11" -and $global:advanceView) -or ($choice -eq "8" -and -not ($global:advanceView))) {
 
             $global:advanceView = !$global:advanceView
             ScreenClear
@@ -1997,7 +2088,7 @@ else{
         }
 
         # The code to exit program
-        elseif (($choice -eq "12" -and $global:advanceView) -or ($choice -eq "8" -and -not ($global:advanceView))) {
+        elseif (($choice -eq "12" -and $global:advanceView) -or ($choice -eq "9" -and -not ($global:advanceView))) {
 
 
             "[" + (Get-CurrentTime) + "] Number of Errors Occurred: $numberError" >> $manLog
