@@ -1,8 +1,9 @@
 # ---------------------------
+# SecureTree
 # For the IRSec competitions
 # Created by Ricker Wilkes
 # Daughter Script of the CyberPatriot Script
-# Master Repository: https://github.com/R-Wilkes/IRSec
+# Master Repository: https://github.com/R-Wilkes/SecureTree
 # ---------------------------
 
 # NOTE: Its gonna be a lot of copy paste from parent repo
@@ -106,10 +107,10 @@ $global:rootPath = "$PSScriptRoot"
 
 
 # Messing with environment variables, sessions specific, not user
-$env:IRSec_Version = $version
-$env:IRSec_CurUser = $curuser
-$env:IRSec_ComputerName = $computerName
-$env:IRSec_RootPath = $rootPath
+$env:SecureTree_Version = $version
+$env:SecureTree_CurUser = $curuser
+$env:SecureTree_ComputerName = $computerName
+$env:SecureTree_RootPath = $rootPath
 
 # Pretend you don't see this
 $global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules3301" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
@@ -198,7 +199,7 @@ else{
     
     $global:numberError = 0
 
-    LogHeader -Name "IRSec Manual Log" -Path $manLog
+    LogHeader -Name "SecureTree Manual Log" -Path $manLog
 
     # Adds to the manual log
     "[" + (Get-CurrentTime) + "] Start of Manual Mode Log" >> $manLog

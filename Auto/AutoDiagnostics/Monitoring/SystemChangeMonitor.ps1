@@ -6,16 +6,16 @@
 
 # Needed to run properly
 # -------------------------------------
-$global:rootPath = $env:IRSec_RootPath
+$global:rootPath = $env:SecureTree_RootPath
 Set-Location -Path "$rootPath"
 
 # Imports the functions needed
 Import-Module -Name "./Data/CommonFunctions/CommonFunctions"
 
 # Set as global variables in the new process
-$global:version = $env:IRSec_Version
-$global:curuser = $env:IRSec_CurUser
-$global:computerName = $env:IRSec_ComputerName
+$global:version = $env:SecureTree_Version
+$global:curuser = $env:SecureTree_CurUser
+$global:computerName = $env:SecureTree_ComputerName
 # -------------------------------------
 
 # Should monitor computers for system changes | AI
@@ -33,7 +33,7 @@ function Start-SystemChangeMonitor {
     CreatePath -DirectoryPath $logPath -Type "File"
 
     $date = Get-Date 
-    "IRSec SystemChangeMonitor Log" >> $logPath
+    "SecureTree SystemChangeMonitor Log" >> $logPath
     "`nWritten On: $date" >> $logPath
     "`nProgram Version: $version" >> $logPath 
     "`nPowershell Version: $($PSVersionTable.PSVersion)" >> $logPath

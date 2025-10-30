@@ -2,7 +2,7 @@
 
 # CIS Microsoft Windows Server 2022 Benchmark based on https://workbench.cisecurity.org/benchmarks/8932
 # Script by Evan Greene from https://github.com/eneerge/CIS-Windows-Server-2022
-# Modded by Ricker Wilkes in https://github.com/R-Wilkes/IRSec
+# Modded by Ricker Wilkes in https://github.com/R-Wilkes/SecureTree
 
 ##########################################################################################################
 $LogonLegalNoticeMessageTitle = "IRSec Owned Server "

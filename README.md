@@ -1,7 +1,21 @@
-# Info
+```
+     ccee88oo
+  C8O8O8Q8PoOb o8oo
+ dOB69QO8PdUOpugoO9bD
+CgggbU8OU qOp qOdoUOdcb
+    6OuU  /p u gcoUodpP
+      \\\//  /douUP
+        \\\////
+         |||/\
+         |||\/
+         |||||
+        //||||\
+```
 
-- This script is meant to be useful in the IRSec competitions
-- Its the daughter script of Cyberpatriot Script (Hopefully the successor)
+# SecureTree Info
+
+- SecureTree is meant to be useful in the IRSec competitions
+- Its the daughter of the Cyberpatriot Script (Hopefully the successor)
 
 - THIS REPO WILL BE PUBLIC ONLY DURING THE COMPETITION, AND WILL BECOME PRIVATE WHEN NOT DOING COMP
 

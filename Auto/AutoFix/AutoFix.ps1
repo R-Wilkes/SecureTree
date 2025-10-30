@@ -15,7 +15,7 @@ CreatePath -DirectoryPath $logPath -Type "File"
 
 # Out log file
 $date = Get-Date 
-"IRSec AutoFix Log" >> $logPath
+"SecureTree AutoFix Log" >> $logPath
 "`nWritten On: $date" >> $logPath
 "`nProgram Version: $version" >> $logPath 
 "`nPowershell Version: $($PSVersionTable.PSVersion)" >> $logPath
