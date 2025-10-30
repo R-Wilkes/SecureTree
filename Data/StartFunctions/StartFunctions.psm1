@@ -167,8 +167,9 @@ function GetMenu($advanceView){
             |   8) Useful Terminals                                                                                             |
             |   9) File Finder                                                                                                  |
             |  10) Run Auto                                                                                                     |
-            |  11) Swap View                                                                                                    |
-            |  12) Exit                                                                                                         |
+            |  11) Domain Controller                                                                                            |
+            |  12) Swap View                                                                                                    |
+            |  13) Exit                                                                                                         |
             [-------------------------------------------------------------------------------------------------------------------]  
             Choice
 "@

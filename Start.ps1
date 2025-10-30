@@ -25,6 +25,9 @@ Import-Module -Name "./Data/FrameBuilder/FrameBuilder" -Force
 # Allows search of prohibited file
 Import-Module -Name "./Data/FileFinder/FileFinder" -Force
 
+# Wallpaper stuff :)
+Import-Module -Name "./Data/FileShare/FileShare" -Force
+
 # Set the terminal screen size to 138 columns and 36 rows
 [System.Console]::WindowWidth = 138
 [System.Console]::WindowHeight = 36
@@ -2086,7 +2089,7 @@ else{
         }
 
         # Some domain controller menu
-        elseif (($choice -eq "7" -and -not ($global:advanceView))){
+        elseif (($choice -eq "11" -and $global:advanceView) -or ($choice -eq "7" -and -not ($global:advanceView))){
 
             if ((IsDC)){
 
@@ -2094,7 +2097,7 @@ else{
                 
                 While ($true){
                 
-                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Exit")
+                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Wallpaper Settings `n 3) Exit")
                     
                     # invoke GPO update on selected computers | AI
                     if ($choice -eq "1"){
@@ -2159,8 +2162,64 @@ else{
                         BuildSubTerminalText -Text "GPO update initiated on selected computer(s)."
                     }
 
-                    # Exits
                     if ($choice -eq "2"){
+
+                        "[" + (Get-CurrentTime) + "] $curuser Entered Wallpaper settings" >> $manLog
+
+
+                        While ($true){
+
+                            $choice = BuildSubOptionFrame(" 1) Initiate Wallpaper `n 2) Remove Wallpaper `n 3) Reset Wallpaper GPO `n 4) Test Wallpaper Share `n 5) Exit")
+
+                            # Initiates the wallpaper
+                            if ($choice -eq "1"){
+
+                                if ((2FA -Message "Want to run Set Wallpaper (UNTESTED)")){
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Set wallpaper" >> $manLog
+
+                                    Set-DomainWallpaperGPO
+                                }
+                            }
+
+                            # Removes the wallpaper
+                            if ($choice -eq "2"){
+                                "[" + (Get-CurrentTime) + "] $curuser Removed Wallpaper settings" >> $manLog
+
+                                Remove-DomainWallpaperGPO -ResetToDefault
+
+                            }
+
+                            # REmoves the wallpaper GPO
+                            if ($choice -eq "3"){
+
+                                "[" + (Get-CurrentTime) + "] $curuser Remove Wallpaper GPO" >> $manLog
+
+                                Remove-WallpaperResetGPO
+
+                            }
+
+                            # Tests the wallpaper share
+                            if ($choice -eq "4"){
+
+                                "[" + (Get-CurrentTime) + "] $curuser Tested Wallpaper deployment" >> $manLog
+
+                                Test-WallpaperDeployment
+
+                            }
+
+                            # Exits
+                            if ($choice -eq "5"){
+
+                                "[" + (Get-CurrentTime) + "] $curuser Exited Wallpaper settings" >> $manLog
+                                break
+
+                            }
+                        }
+                    }
+
+                    # Exits
+                    if ($choice -eq "3"){
                         "[" + (Get-CurrentTime) + "] $curuser Exited DC GPO Menu" >> $manLog
                         break
                     }
@@ -2176,7 +2235,7 @@ else{
         }
 
         # Swaps the view of the terminal
-        elseif (($choice -eq "11" -and $global:advanceView) -or ($choice -eq "8" -and -not ($global:advanceView))) {
+        elseif (($choice -eq "12" -and $global:advanceView) -or ($choice -eq "8" -and -not ($global:advanceView))) {
 
             $global:advanceView = !$global:advanceView
             ScreenClear
@@ -2184,7 +2243,7 @@ else{
         }
 
         # The code to exit program
-        elseif (($choice -eq "12" -and $global:advanceView) -or ($choice -eq "9" -and -not ($global:advanceView))) {
+        elseif (($choice -eq "13" -and $global:advanceView) -or ($choice -eq "9" -and -not ($global:advanceView))) {
 
 
             "[" + (Get-CurrentTime) + "] Number of Errors Occurred: $numberError" >> $manLog
