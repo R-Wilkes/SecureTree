@@ -25,8 +25,6 @@ $date = Get-Date
 $current_path = Get-Location
 $hostname = hostname
 
-$allUsersPassword = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
-
 # Will set users based on the list provided
 if (-not (IsAD)){
 
@@ -75,12 +73,11 @@ if (-not (IsAD)){
                 $good = UserCheck $user.Name
                 if ($good -eq $false) {
 
-                    $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                    New-LocalUser "$user" -Password $np -FullName "$user" | Out-Null
+                    New-LocalUser "$user" -Password $scriptDefaultPassword -FullName "$user" | Out-Null
                     Add-LocalGroupMember -Group "Users" -Member "$user" | Out-Null
 
                     Write-Host "Creating Local User: '$user'" -ForegroundColor Yellow
-                    "`nCreated Local User: $user With password '$allUsersPassword'" >> $logPath
+                    "`nCreated Local User: $user With default script password" >> $logPath
                     
                 }
             }
@@ -93,12 +90,11 @@ if (-not (IsAD)){
                 $good = UserCheck $user.Name
                 if ($good -eq $false) {
 
-                    $np = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                    New-LocalUser "$admin" -Password $np -FullName "$admin"
+                    New-LocalUser "$admin" -Password $scriptDefaultPassword -FullName "$admin"
                     Add-LocalGroupMember -Group "Administrators" -Member "$admin"
             
                     Write-Host "Creating Local admin: '$admin'" -ForegroundColor Yellow
-                    "`nCreated Local Admin: $admin With password '$allUsersPassword'" >> $logPath
+                    "`nCreated Local Admin: $admin With default script password" >> $logPath
 
                 }
             }
@@ -178,9 +174,7 @@ if (-not (IsAD)){
             $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
             if ($existingUser -and $user -notin $usersToNotRemove) {
 
-
-                $newPassword = ConvertTo-SecureString -String "$allUsersPassword" -AsPlainText -Force
-                Set-LocalUser -Name $user -Password $newPassword
+                Set-LocalUser -Name $user -Password $scriptDefaultPassword
                 Write-Host "Changed password for local user: '$user'" -ForegroundColor Magenta
                 "`nChanged Password for Local user: $user" >> $logPath
 
@@ -192,8 +186,7 @@ if (-not (IsAD)){
             $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
             if ($existingUser -and $admin -notin $usersToNotRemove) {
 
-                $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                Set-LocalUser -Name $admin -Password $newPassword
+                Set-LocalUser -Name $admin -Password $scriptDefaultPassword
                 Write-Host "Changed password for Local admin '$admin'" -ForegroundColor Magenta
                 "`nChanged password for Local admin: $admin" >> $logPath
 
@@ -261,11 +254,10 @@ if ((IsAD)){
                 $good = DomainUserCheck $user
                 if ($good -eq $false) {
                     try {
-                        $securePassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                        New-ADUser -Name $user -SamAccountName $user -UserPrincipalName "$user@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $securePassword -Enabled $true -ChangePasswordAtLogon $false
+                        New-ADUser -Name $user -SamAccountName $user -UserPrincipalName "$user@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $scriptDefaultPassword -Enabled $true -ChangePasswordAtLogon $false
                         
                         Write-Host "Creating Domain User: '$user'" -ForegroundColor Yellow
-                        "`nCreated Domain User: $user With password '$allUsersPassword'" >> $logPath
+                        "`nCreated Domain User: $user With default script password" >> $logPath
                     }
                     catch {
                         Write-Host "Failed to create domain user: $user - $($_.Exception.Message)" -ForegroundColor Red
@@ -284,14 +276,14 @@ if ((IsAD)){
                 $good = DomainUserCheck $admin
                 if ($good -eq $false) {
                     try {
-                        $securePassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                        New-ADUser -Name $admin -SamAccountName $admin -UserPrincipalName "$admin@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $securePassword -Enabled $true -ChangePasswordAtLogon $false
+
+                        New-ADUser -Name $admin -SamAccountName $admin -UserPrincipalName "$admin@$($domain.DNSRoot)" -Path $usersOU -AccountPassword $scriptDefaultPassword -Enabled $true -ChangePasswordAtLogon $false
                         
                         # Add to Domain Admins group
                         Add-ADGroupMember -Identity "Domain Admins" -Members $admin
                         
                         Write-Host "Creating Domain Admin: '$admin'" -ForegroundColor Yellow
-                        "`nCreated Domain Admin: $admin With password '$allUsersPassword'" >> $logPath
+                        "`nCreated Domain Admin: $admin With default script password" >> $logPath
                     }
                     catch {
                         Write-Host "Failed to create domain admin: $admin - $($_.Exception.Message)" -ForegroundColor Red
@@ -398,8 +390,7 @@ if ((IsAD)){
                 $existingUser = Get-ADUser -Identity $user -ErrorAction Stop
                 if ($user -notin $usersToNotRemove) {
                     try {
-                        $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                        Set-ADAccountPassword -Identity $user -NewPassword $newPassword -Reset
+                        Set-ADAccountPassword -Identity $user -NewPassword $scriptDefaultPassword -Reset
                         Write-Host "Changed password for domain user: '$user'" -ForegroundColor Magenta
                         "`nChanged Password for Domain user: $user" >> $logPath
                     }
@@ -420,8 +411,7 @@ if ((IsAD)){
                 $existingUser = Get-ADUser -Identity $admin -ErrorAction Stop
                 if ($admin -notin $usersToNotRemove) {
                     try {
-                        $newPassword = ConvertTo-SecureString -String $allUsersPassword -AsPlainText -Force
-                        Set-ADAccountPassword -Identity $admin -NewPassword $newPassword -Reset
+                        Set-ADAccountPassword -Identity $admin -NewPassword $scriptDefaultPassword -Reset
                         Write-Host "Changed password for Domain admin '$admin'" -ForegroundColor Magenta
                         "`nChanged password for Domain admin: $admin" >> $logPath
                     }

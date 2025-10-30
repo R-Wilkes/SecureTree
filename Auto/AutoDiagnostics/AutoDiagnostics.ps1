@@ -29,8 +29,6 @@ $date = Get-Date
 $current_path = Get-Location
 $hostname = hostname
 
-$allUsersPassword = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
-
 # Looks for Local users, only works if not on AD
 if (-not (IsAD)){
 
@@ -72,7 +70,7 @@ if (-not (IsAD)){
             if ($good -eq $false) {
         
                 Write-Host "Should Create Local User: '$user'" -ForegroundColor Yellow
-                "`nShould create Local User: $user With password '$allUsersPassword'" >> $logPath
+                "`nShould create Local User: $user" >> $logPath
                 
             }
         }
@@ -86,7 +84,7 @@ if (-not (IsAD)){
             if ($good -eq $false) {
         
                 Write-Host "Should Create Local admin: '$admin'" -ForegroundColor Yellow
-                "`nShould Create Local Admin: $admin With password '$allUsersPassword'" >> $logPath
+                "`nShould Create Local Admin: $admin" >> $logPath
 
             }
         }

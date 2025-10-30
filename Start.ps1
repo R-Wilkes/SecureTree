@@ -111,6 +111,7 @@ $env:IRSec_CurUser = $curuser
 $env:IRSec_ComputerName = $computerName
 $env:IRSec_RootPath = $rootPath
 
+# Pretend you don't see this
 $global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules3301" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
 # -----------------------------------------
@@ -2088,7 +2089,7 @@ else{
             }
         }
 
-        # Some domain controller menu
+        # Domain controller menu
         elseif (($choice -eq "11" -and $global:advanceView) -or ($choice -eq "7" -and -not ($global:advanceView))){
 
             if ((IsDC)){
