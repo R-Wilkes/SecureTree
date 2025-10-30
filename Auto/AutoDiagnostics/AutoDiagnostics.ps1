@@ -387,6 +387,7 @@ if ((IsDC)){
 
     # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
     Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoDiagnostics\Monitoring\SystemChangeMonitor.ps1"
+
 }
 
 # Shows all programs on PC

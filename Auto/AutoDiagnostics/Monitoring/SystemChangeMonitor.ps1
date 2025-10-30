@@ -237,6 +237,10 @@ function Start-EventBasedSystemMonitor {
                         7040 { 'Yellow' }
                         default { 'Cyan' }
                     }
+
+                    if ($serviceName = ""){
+                        Write-Host $eventData
+                    }
                     
                     $message = "[$(Get-Date)] $eventType - $computer - Service: $serviceName"
                     Write-Host $message -ForegroundColor $color

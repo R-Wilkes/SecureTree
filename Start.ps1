@@ -119,17 +119,17 @@ $global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules3301" 
 # NOTE: I confined all the variables and run checks into the LoadingScreen, so its kind of needed to run
 # Does the loading screen, and all checks to make sure everything is good to go
 
-# LoadingScreen
+LoadingScreen
 
-# ScreenClear
+ScreenClear
 
-# ConfirmInfo
+ConfirmInfo
 
-# ScreenClear
+ScreenClear
 
-# ShowDisabled
+ShowDisabled
 
-# ScreenClear
+ScreenClear
 
 # End of the variables and code that are needed for the script to even start up
 # -------------------------------------------------------------------
@@ -1190,7 +1190,7 @@ else{
                                 # Get default Users container or let user choose OU
                                 $defaultPath = "CN=Users," + (Get-ADDomain).DistinguishedName
                                 
-                                New-ADUser -SamAccountName $newUserName -Name $newUserName -DisplayName $newUserName -AccountPassword $newUserPassword -Path $defaultPath -Enabled $true -ChangePasswordAtLogon $true
+                                New-ADUser -SamAccountName $newUserName -Name $newUserName -DisplayName $newUserName -AccountPassword $newUserPassword -Path $defaultPath -Enabled $true
                                 
                                 "[" + (Get-CurrentTime) + "] $curuser Added new Domain User $newUserName" >> $manLog
                                 Write-Host "Created domain user $newUserName" -ForegroundColor Green
@@ -1307,8 +1307,16 @@ else{
             ScreenClear
             Write-Host "Don't blow up your machine"
             Write-Host "GPO are set from the Domain Controller, those will be manual set until I find a way to import them without giving my security audits away"
+            Write-Host "Will have to manually update GPO on client machines using 'gpupdate'"
             Write-Host "Some registry Keys can not be set via Script, I don't know why, so you have to do it manually"
             Write-Host "Set SMB protocol to version 2, cause version 1 has Eternal blue vulnerability"
+            Write-Host "`n `n `n `n"
+            Write-Host "Set up remote management for easy GPO updating: `n -------------------------------------"
+            Write-Host "Enable-NetFirewallRule -DisplayGroup 'Remote Scheduled Tasks Management'"
+            Write-Host "Start-Service -Name RemoteRegistry"
+            Write-Host "Set-Service -Name RemoteRegistry -StartupType Automatic"
+
+
             Read-Host -Prompt "Press enter to exit"
 
             # Adds to the manual log
