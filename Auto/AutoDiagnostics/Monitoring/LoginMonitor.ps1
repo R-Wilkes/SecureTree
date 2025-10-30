@@ -20,7 +20,7 @@ $global:computerName = $env:IRSec_ComputerName
 # This is AI, lots of prompting tho | AI
 function Start-DomainLogonMonitor {
     param(
-        [int]$RefreshInterval = 2  # Check every 1 second
+        [int]$RefreshInterval = 5  # Check every 1 second
     )
 
     $hour = (Get-Date).Hour

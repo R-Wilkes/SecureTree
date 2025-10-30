@@ -1311,6 +1311,10 @@ else{
             Write-Host "Some registry Keys can not be set via Script, I don't know why, so you have to do it manually"
             Write-Host "Set SMB protocol to version 2, cause version 1 has Eternal blue vulnerability"
             Write-Host "`n `n `n `n"
+            Write-Host "For GPO Advanced audit logging must override the setting:"
+            Write-Host "Audit: Force audit policy subcategory setting (Windows Vista or later) to override audit policy category settings"
+            Write-Host "Found in Policys/Windows Settings/Security Settings/Local Policys/Security Options"
+            Write-Host "`n `n `n `n"
             Write-Host "Set up remote management for easy GPO updating: `n -------------------------------------"
             Write-Host "Enable-NetFirewallRule -DisplayGroup 'Remote Scheduled Tasks Management'"
             Write-Host "Start-Service -Name RemoteRegistry"
@@ -1585,7 +1589,7 @@ else{
 
                 ScreenClear
                 
-                $op = BuildSubOptionFrame(" 1) Run AutoDiagnostics.ps1 `n 2) Run AutoFix.ps1 `n 3) Run Policys.ps1 `n 4) Exit")
+                $op = BuildSubOptionFrame(" 1) Run AutoDiagnostics.ps1 `n 2) Run AutoFix.ps1 `n 3) Run Policys.ps1 `n 4) Run LoginMonitor.ps1 `n 5) Run SystemChangeMonitor.ps1 `n 6) Exit")
     
                 # AutoDiagnostics
                 if ($op -eq "1") {
@@ -1617,8 +1621,42 @@ else{
         
                 }
 
-                # Exit
+                # LoginMonitoring
                 if ($op -eq "4") {
+
+                    if ((IsDC)){
+
+                        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoDiagnostics\Monitoring\LoginMonitor.ps1"
+
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Ran LoginMonitor.ps1" >> $manLog
+                    
+                    }
+
+                    else{
+                        BuildSubTerminalText -Text "Not on a Domain Controller"
+                    }
+                }
+
+                # SystemChangeMonitor
+                if ($op -eq "5") {
+
+                    if ((IsDC)){
+
+                        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoDiagnostics\Monitoring\SystemChangeMonitor.ps1"
+
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Ran SystemChangeMonitor.ps1" >> $manLog
+
+                    }
+
+                    else{
+                        BuildSubTerminalText -Text "Not on a Domain Controller"
+                    }
+                }
+
+                # Exit
+                if ($op -eq "6") {
                     
                     $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Inquire
 
@@ -1639,7 +1677,12 @@ else{
 
                 ScreenClear
 
-                $choice = BuildSubOptionFrame(" 1) Guest Account [1E/1D] `n 2) Fire Wall [2E/2D] `n 3) Linked Connections [3E/3D] `n 4) UAC [4E/4D] `n 5) FTP Service [5E/5D] `n 6) Exit")
+                # Here temporary till I feel like fixing
+                $Text = " 1) Guest Account [1E/1D] `n 2) Fire Wall [2E/2D] `n 3) Linked Connections [3E/3D] `n 4) UAC [4E/4D] `n 5) FTP Service [5E/5D] `n 6) Exit"
+                BuildFrame -text $Text
+                $choice = Read-Host "Input: "
+
+                # $choice = BuildSubOptionFrame(" 1) Guest Account [1E/1D] `n 2) Fire Wall [2E/2D] `n 3) Linked Connections [3E/3D] `n 4) UAC [4E/4D] `n 5) FTP Service [5E/5D] `n 6) Exit")
 
                 try{
 

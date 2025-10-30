@@ -133,7 +133,7 @@ function WindowsVersionInfo{
 
 # Checks if IRSec image, don't have anything for this yet
 function IsIRSec{
-   return $false
+   return $true
 }
 
 # Moved the 2 menu types into this function

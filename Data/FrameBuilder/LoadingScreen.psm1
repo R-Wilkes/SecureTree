@@ -238,7 +238,7 @@ function ConfirmInfo{
     $spacing = "`n `n `n `t `t `t `t `t `t `t" 
 
     # Im sorry, its a very long string
-    CenterText -Text ("Please make sure all information below is correct before moving forward!`n`n`n $spacing Current User: $curuser $spacing Computer Name: $computerName $spacing OS: $(WindowsVersionInfo) $spacing Is IRSec Image: $(IsIRSec) $spacing Is Active Directory: $(ADInfo) `n `n `n") -Border $true
+    CenterText -Text ("Please make sure all information below is correct before moving forward!`n`n`n $spacing Current User: $curuser $spacing Computer Name: $computerName $spacing OS: $(WindowsVersionInfo) $spacing Is IRSec Image: $(IsIRSec) $spacing Is Active Directory: $(ADInfo) $spacing Is Domain Controller: $(IsDC)`n `n `n") -Border $true
     # Keeps things quick
     if (Config("fast_mode")){
         Start-Sleep -Milliseconds 500
@@ -257,19 +257,11 @@ function ShowDisabled{
 
     $disabledText = ""
 
+    # NOTE: not much here, I fixed a lot ofo it
+
     # If the OS is not a pro version, then disable the group policy editor
     if (IsHome){
         $disabledText += "Home Edition - Local Group Editor, Security Editor and Policy Editor are disabled`n`n"
-    }
-
-    # If server edition, then disable the avast install option
-    if (IsServer){
-        $disabledText += "Server Edition - Avast Install Option is disabled`n"
-    }
-
-    # If an Active Directory is detected, then disable all users configurations are disabled, ran out of time to figure out how to do this
-    if (IsAD){
-        $disabledText += "Active Directory - All User Configurations are disabled, your on your own pal`n`n"
     }
 
     # If not on a IRSec image, then disable the IRSec options

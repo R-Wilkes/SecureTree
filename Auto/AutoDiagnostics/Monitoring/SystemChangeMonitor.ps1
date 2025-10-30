@@ -168,7 +168,7 @@ function Start-SystemChangeMonitor {
 
 function Start-EventBasedSystemMonitor {
     param(
-        [int]$RefreshInterval = 2,
+        [int]$RefreshInterval = 30,
         [string[]]$ComputerNames = @()
     )
     
