@@ -166,7 +166,6 @@ function Start-SystemChangeMonitor {
     }
 }
 
-
 function Start-EventBasedSystemMonitor {
     param(
         [int]$RefreshInterval = 2,
@@ -191,7 +190,7 @@ function Start-EventBasedSystemMonitor {
         foreach ($computer in $ComputerNames) {
             $computerIndex++
             
-            Write-Progress -Activity "Event Monitor - Scan #$scanCount" -Status "Checking: $computer ($computerIndex of $($ComputerNames.Count))" -PercentComplete ([math]::Round(($computerIndex / $ComputerNames.Count) * 100))
+            Write-Progress -Activity "NOTE: NOT TESTED FULLY | Event Monitor - Scan #$scanCount" -Status "Checking: $computer ($computerIndex of $($ComputerNames.Count))" -PercentComplete ([math]::Round(($computerIndex / $ComputerNames.Count) * 100))
             
             try {
                 # Service Control Manager events (7034, 7035, 7036, 7040)

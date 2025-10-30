@@ -108,7 +108,7 @@ $env:IRSec_CurUser = $curuser
 $env:IRSec_ComputerName = $computerName
 $env:IRSec_RootPath = $rootPath
 
-$scriptDefaultPassword = "CybersecurityRules3301" # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
+$global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules3301" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
 # -----------------------------------------
 
@@ -826,28 +826,39 @@ else{
                                         while ($true){
 
                                             ScreenClear
-                                            $newPassword = CenterText -Text "Resetting Password for $who" -PromptString "New Password"
+                                            $newPassword = CenterText -Text "Resetting Password for $who" -PromptString "New Password" -SecureString $true
+
+                                            # Don't know if this is safe, but oh well
+                                            $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($newPassword)
+                                            $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                                            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
 
                                             # If its nothing
-                                            if ($newPassword -eq ""){
-                                                "[" + (Get-CurrentTime) + "] Exited Reset Password for AD User $who" >> $manLog
+                                            if ($newPassword -eq "" -or $plainPassword -eq ""){
+                                                
+                                                $newPassword = $global:scriptDefaultPassword
+                                                BuildSubTerminalText -Text "Setting password to script default"
+                                                "[" + (Get-CurrentTime) + "] Setting password for $who to script default" >> $manLog
+                                                $plainPassword = $null
                                                 break
+
                                             }
 
                                             # If it does not pass the password tests
-                                            if (-not (PassesPasswordPolicy -TestPass $newPassword)){
+                                            elseif (-not (PassesPasswordPolicy -TestPass $plainPassword)){
                                                 BuildSubTerminalText -Text "Password does not meet password policy requirements"
+                                                $plainPassword = $null
                                             }
 
                                             else{
 
-                                                $newPassword = ConvertTo-SecureString $newPassword -AsPlainText -Force
                                                 Set-ADAccountPassword -Identity $who -NewPassword $newPassword -Reset
                                                 Set-ADUser -Identity $who -ChangePasswordAtLogon $true
                                                 Write-Host "Password reset for $who" -ForegroundColor Green
 
                                                 # Adds to the manual log
                                                 "[" + (Get-CurrentTime) + "] $curuser Reset Password for AD User $who" >> $manLog
+                                                $plainPassword = $null
                                                 break
 
                                             }
@@ -858,8 +869,7 @@ else{
                                     elseif ($what -eq "2"){
                                         
                                         ScreenClear
-                                        $defaultPassword = ConvertTo-SecureString $scriptDefaultPassword -AsPlainText -Force
-                                        Set-ADAccountPassword -Identity $who -NewPassword $defaultPassword
+                                        Set-ADAccountPassword -Identity $who -NewPassword  $global:scriptDefaultPassword
                                         Set-ADUser -Identity $who -ChangePasswordAtLogon $false
                                         Write-Host "Password set to script default for $who" -ForegroundColor Green
 
@@ -1139,8 +1149,43 @@ else{
                             } 
                             
                             else {
-                                $newUserPassword = CenterText -Text "Password for $newUserName" -PromptString "Password" -SecureString $true
-                               
+
+                                # Makes you enter a password required
+                                While ($true){
+
+                                    $newUserPassword = CenterText -Text "Password for $newUserName" -PromptString "Password" -SecureString $true
+
+                                    # Don't know if this is safe, but oh well
+                                    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($newUserPassword)
+                                    $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                                    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+                                    # In case you don't enter anything
+                                    if ($plainPassword -eq "" -or $NewUserPassword -eq ""){
+
+                                        $NewUserPassword =  $global:scriptDefaultPassword
+                                        BuildSubTerminalText -Text "Setting password to script default"
+                                        "[" + (Get-CurrentTime) + "] Setting password for $newUserName to script default" >> $manLog
+                                        $plainPassword = $null
+                                        break
+
+                                    }
+
+                                    # If it does not pass the password tests
+                                    elseif (-not (PassesPasswordPolicy -TestPass $plainPassword)){
+
+                                        BuildSubTerminalText -Text "Password does not meet password policy requirements"
+                                        $plainPassword = $null 
+
+                                    }
+
+                                    else{
+
+                                        $plainPassword = $null 
+                                        break
+
+                                    }
+                                }
                                 
                                 # Get default Users container or let user choose OU
                                 $defaultPath = "CN=Users," + (Get-ADDomain).DistinguishedName
@@ -1150,6 +1195,7 @@ else{
                                 "[" + (Get-CurrentTime) + "] $curuser Added new Domain User $newUserName" >> $manLog
                                 Write-Host "Created domain user $newUserName" -ForegroundColor Green
                             }
+
                         } catch {
                             WriteErrorLog -ErrorRecord $_
                         }
@@ -1253,7 +1299,6 @@ else{
                     }
                 }
             }
-
         }
 
         # Stupid Note thing
