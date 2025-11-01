@@ -1,7 +1,7 @@
 
 # The new CLI is fancy stuff
-Import-Module -Name "./Data/FrameBuilder/CLIBuilder" -Force
-Import-Module -Name "./Data/FrameBuilder/LoadingScreen" -Force
+Import-Module -Name "./Data/FrameBuilder/CLIBuilder" 
+Import-Module -Name "./Data/FrameBuilder/LoadingScreen"
 
 # Cool ass frame builder for text because why not, and as i said, im going all out
 

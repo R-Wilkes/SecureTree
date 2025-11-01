@@ -15,19 +15,19 @@
 Set-Location -Path "$PSScriptRoot"
 
 # Most of the main Function for the StartScript
-Import-Module -Name "./Data/StartFunctions/StartFunctions" -Force
+Import-Module -Name "./Data/StartFunctions/StartFunctions"
 
 # Common Functions that are used in all of the scripts
-Import-Module -Name "./Data/CommonFunctions/CommonFunctions" -Force
+Import-Module -Name "./Data/CommonFunctions/CommonFunctions"
 
 # This is only here because I want some cool frames around the text
-Import-Module -Name "./Data/FrameBuilder/FrameBuilder" -Force
+Import-Module -Name "./Data/FrameBuilder/FrameBuilder"
 
 # Allows search of prohibited file
-Import-Module -Name "./Data/FileFinder/FileFinder" -Force
+Import-Module -Name "./Data/FileFinder/FileFinder"
 
 # Wallpaper stuff :)
-Import-Module -Name "./Data/FileShare/FileShare" -Force
+Import-Module -Name "./Data/FileShare/FileShare"
 
 # Set the terminal screen size to 138 columns and 36 rows
 [System.Console]::WindowWidth = 138
@@ -88,7 +88,7 @@ $global:creator = "Ricker Wilkes"
 $global:creator | Out-Null
 
 # Version = MainVersion.SubVersion.PatchVersion
-$global:version = "0.1"
+$global:version = "1.0"
 $global:version | Out-Null
 
 # Gets current User
@@ -104,7 +104,6 @@ $global:tempData = "./Data/TempData"
 $global:tempData | Out-Null
 
 $global:rootPath = "$PSScriptRoot"
-
 
 # Messing with environment variables, sessions specific, not user
 $env:SecureTree_Version = $version

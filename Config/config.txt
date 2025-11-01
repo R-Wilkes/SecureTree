@@ -16,7 +16,7 @@ run_auto_diagnostic = True
 run_auto_fix = Ask
 
 ## AutoDiagnostics
-find_files = False
+find_files = Ask
 run_winPEAS = Ask
 
 ## AutoFix
