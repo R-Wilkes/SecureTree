@@ -40,7 +40,7 @@ if (-not (IsDC)){
         $adminListPath = "$current_path/UserLists/Local_Admins.txt"
 
         # Ignore these users
-        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "dd-agent", "whiteteam"
 
         # Will just see if the user is in users to not remove
         function UserCheck {
@@ -240,7 +240,7 @@ if ((IsDC)){
         $adminListPath = "$current_path/UserLists/Domain_Admins.txt"
 
         # Ignore these users (domain format)
-        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "whiteteam", "dd-agent"
 
         # Function to check if user should be protected
         function DomainUserCheck {
