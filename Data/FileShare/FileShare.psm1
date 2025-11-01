@@ -7,10 +7,11 @@ function Set-DomainWallpaperGPO {
         [string]$GPOName = "Domain Wallpaper Policy",
         [string]$WallpaperStyle = "Stretch", # Fill, Fit, Stretch, Tile, Center, Span
         [switch]$CreateNewGPO,
-        [switch]$WhatIf
+        [switch]$WhatIf,
+        [switch]$SetLockScreen = $true  # New parameter to control lock screen setting
     )
 
-    Write-Host "Setting up Domain Wallpaper Policy using SYSVOL..." -ForegroundColor Green
+    Write-Host "Setting up Domain Wallpaper and Lock Screen Policy using SYSVOL..." -ForegroundColor Green
     
     # Get current directory and wallpaper path
     $currentDirectory = $global:rootPath + "/Data/FileShare/"# It can do all this, but not file paths bro
@@ -65,6 +66,9 @@ function Set-DomainWallpaperGPO {
         Write-Host "Would copy wallpaper to: $wallpaperSysvolPath" -ForegroundColor Cyan
         Write-Host "Would create/update GPO: $GPOName" -ForegroundColor Cyan
         Write-Host "Would set wallpaper to: $wallpaperSysvolPath" -ForegroundColor Cyan
+        if ($SetLockScreen) {
+            Write-Host "Would set lock screen to: $wallpaperSysvolPath" -ForegroundColor Cyan
+        }
         Write-Host "Source wallpaper: $wallpaperPath" -ForegroundColor Cyan
         return
     }
@@ -110,7 +114,7 @@ function Set-DomainWallpaperGPO {
             }
             
             # Create new GPO
-            $gpo = New-GPO -Name $GPOName -Comment "Enforces domain wallpaper on all computers via SYSVOL"
+            $gpo = New-GPO -Name $GPOName -Comment "Enforces domain wallpaper and lock screen on all computers via SYSVOL"
             Write-Host "Created new GPO: $GPOName" -ForegroundColor Green
             
             # Link to Domain root
@@ -134,8 +138,36 @@ function Set-DomainWallpaperGPO {
         Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 1
         
         Write-Host "Configured wallpaper settings in GPO" -ForegroundColor Green
+        
+        # NEW: Configure lock screen settings
+        if ($SetLockScreen) {
+            Write-Host "Configuring lock screen settings..." -ForegroundColor Cyan
+            
+            # Windows 10/11 Lock Screen settings
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value $wallpaperUNC
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoLockScreen" -Type DWord -Value 0
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoChangingLockScreen" -Type DWord -Value 1
+            
+            # Additional lock screen enforcement for Windows 10/11
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Background" -Type DWord -Value 0
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Accent" -Type DWord -Value 0
+            
+            # Force lock screen image (Windows 10/11 specific)
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value $wallpaperUNC
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value $wallpaperUNC
+            
+            # Disable lock screen slideshow and other features
+            Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Lock Screen" -ValueName "SlideshowEnabled" -Type DWord -Value 0
+            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" -ValueName "DisableLockScreenAppNotifications" -Type DWord -Value 1
+            
+            Write-Host "Configured lock screen settings in GPO" -ForegroundColor Green
+        }
+        
         Write-Host "Wallpaper path: $wallpaperUNC" -ForegroundColor White
         Write-Host "Wallpaper style: $WallpaperStyle" -ForegroundColor White
+        if ($SetLockScreen) {
+            Write-Host "Lock screen: $wallpaperUNC" -ForegroundColor White
+        }
         
     } catch {
         Write-Error "Failed to configure GPO: $($_.Exception.Message)"
@@ -162,15 +194,19 @@ function Set-DomainWallpaperGPO {
     Write-Host "SYSVOL Path: $wallpaperSysvolPath" -ForegroundColor White
     Write-Host "GPO Name: $GPOName" -ForegroundColor White
     Write-Host "Wallpaper: $wallpaperUNC" -ForegroundColor White
+    if ($SetLockScreen) {
+        Write-Host "Lock Screen: $wallpaperUNC" -ForegroundColor White
+    }
     Write-Host "Local source: $wallpaperPath" -ForegroundColor White
     Write-Host "Policy applied to: Domain root (all computers)" -ForegroundColor White
     
     Write-Host "`nNext Steps:" -ForegroundColor Yellow
     Write-Host "1. Run 'gpupdate /force' on client machines" -ForegroundColor Gray
     Write-Host "2. Users may need to log off/on to see changes" -ForegroundColor Gray
-    Write-Host "3. Verify SYSVOL access: Test-Path '$wallpaperUNC'" -ForegroundColor Gray
-    Write-Host "4. Check GPO application: gpresult /h gpreport.html" -ForegroundColor Gray
-    Write-Host "5. SYSVOL replication will distribute to all DCs automatically" -ForegroundColor Gray
+    Write-Host "3. Lock screen changes require reboot on some systems" -ForegroundColor Gray
+    Write-Host "4. Verify SYSVOL access: Test-Path '$wallpaperUNC'" -ForegroundColor Gray
+    Write-Host "5. Check GPO application: gpresult /h gpreport.html" -ForegroundColor Gray
+    Write-Host "6. SYSVOL replication will distribute to all DCs automatically" -ForegroundColor Gray
 
     Read-Host "Enter To Continue"
 }
@@ -204,6 +240,8 @@ function Remove-DomainWallpaperGPO {
         
         try {
             $resetGPOName = "Reset Wallpaper to Default"
+
+            
             
             # Remove existing reset GPO if it exists
             $existingResetGPO = Get-GPO -Name $resetGPOName -ErrorAction SilentlyContinue
@@ -225,6 +263,31 @@ function Remove-DomainWallpaperGPO {
             # Configure reset to default Windows wallpaper
             $defaultWallpaper = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
             
+            # In the Remove-DomainWallpaperGPO function, update the reset section:
+
+# Configure reset to default Windows wallpaper AND lock screen
+$defaultWallpaper = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
+
+    # Clear custom wallpaper policies
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value "10"
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
+
+    # Remove wallpaper restrictions
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 0
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 0
+
+    # NEW: Reset lock screen settings
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoChangingLockScreen" -Type DWord -Value 0
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Background" -Type DWord -Value 1
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Accent" -Type DWord -Value 1
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Lock Screen" -ValueName "SlideshowEnabled" -Type DWord -Value 1
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" -ValueName "DisableLockScreenAppNotifications" -Type DWord -Value 0
+
+    # Clear lock screen image enforcement
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value ""
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value ""
+    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value ""
             # Clear custom wallpaper policies
             Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
             Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value "10"
