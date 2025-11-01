@@ -40,7 +40,7 @@ if (-not (IsDC)){
         $adminListPath = "$current_path/UserLists/Local_Admins.txt"
 
         # Ignore these users
-        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "dd-agent", "whiteteam"
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "dd-agent", "whiteteam", "cloudbase-init"
 
         # Will just see if the user is in users to not remove
         function UserCheck {
