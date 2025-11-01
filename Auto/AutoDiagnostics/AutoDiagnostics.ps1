@@ -27,10 +27,9 @@ $date = Get-Date
 "`nComputer Name: $computerName" >> $logPath
 
 $current_path = Get-Location
-$hostname = hostname
 
 # Looks for Local users, only works if not on AD
-if (-not (IsAD)){
+if (-not (IsDC)){
 
     # Define paths to user and admin text files
     $userListPath = "$current_path/UserLists/Local_Users.txt"
@@ -45,7 +44,7 @@ if (-not (IsAD)){
             [string]$inputString
         )
 
-        $inputString = $inputString.replace("$hostname\","")
+        $inputString = $inputString.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
 
         if ($usersToNotRemove -contains $inputString) {
             return $true
@@ -115,14 +114,15 @@ if (-not (IsAD)){
     try {
         
         # Revoke administrative privileges from users not in the admins list
-        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
+        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $admins }
         foreach ($admin in $allAdmins) {
             $good = UserCheck $admin.Name
             if ($good -eq $false) {
-                if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
+                if ($admin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $usersToRemove){
         
-                    Write-Host "Need to Remove admin perms: $($admin.name)" -ForegroundColor Red
-                    "`nNeed to Changes Perms to standard for user: $($admin.name)" >> $logPath
+                    $adminName = $admin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                    Write-Host "Need to Remove admin perms: $adminName" -ForegroundColor Red
+                    "`nNeed to Changes Perms to standard for user: $adminName" >> $logPath
                 
                 }
             }
@@ -134,25 +134,45 @@ if (-not (IsAD)){
         "`nUnable to get group: Administrators" >> $logPath
     }
 
-    # Grant administrative privileges to users in the admins list
+    # Grant administrative privileges to users in the admins list | AI
     foreach ($admin in $admins) {
         $existingUser = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
         if ($existingUser) {
 
             $good = UserCheck $admin
             if ($good -eq $false) {
-                if ($admin.replace("$hostname\","") -notin $usersToRemove){
-                    Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
-                    "`nChange Perms to Admin for user: $admin" >> $logPath
+                if ($admin.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $usersToRemove){
+                    
+                    # NEW: Check if user is already in Administrators group
+                    $cleanAdminName = $admin.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                    $isAlreadyAdmin = $false
+                    
+                    try {
+                        $currentAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+                        foreach ($currentAdmin in $currentAdmins) {
+                            $currentCleanName = $currentAdmin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                            if ($currentCleanName -eq $cleanAdminName) {
+                                $isAlreadyAdmin = $true
+                                break
+                            }
+                        }
+                    } catch {
+                        # If we can't check, assume they need to be added
+                        $isAlreadyAdmin = $false
+                    }
+                    
+                    # Only report if they're NOT already an admin
+                    if (-not $isAlreadyAdmin) {
+                        Write-Host "Need to Add admin perms: $admin" -ForegroundColor Yellow
+                        "`nChange Perms to Admin for user: $admin" >> $logPath
+                    }
                 }
             }
         }
-
         else {
             Write-Host "$admin does not exist or is not a local user. (Ignore)"
         }
     }
-
     # For each loop to change passwords for users in user_list.txt
     foreach ($user in $users) {
         $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
@@ -180,7 +200,7 @@ if (-not (IsAD)){
 }
 
 # All AI, just revamped my local users, only works for AD users | AI
-if (IsAD) {
+if (IsDC) {
 
     "`nActive Directory: $((Get-ADDomain).Name)" >> $logPath
     Write-Host "On Active Directory Domain: $((Get-ADDomain).Name)" -ForegroundColor Cyan

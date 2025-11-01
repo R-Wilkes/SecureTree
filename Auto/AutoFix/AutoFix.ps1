@@ -23,10 +23,9 @@ $date = Get-Date
 "`nComputer Name: $computerName" >> $logPath
 
 $current_path = Get-Location
-$hostname = hostname
 
 # Will set users based on the list provided
-if (-not (IsAD)){
+if (-not (IsDC)){
 
     if (Config("set_local_users")){
 
@@ -49,7 +48,7 @@ if (-not (IsAD)){
                 [string]$inputString
             )
 
-            $inputString = $inputString.replace("$hostname\","")
+            $inputString = $inputString.replace("$computerName\","").replace("$($computerName.ToUpper())\", "")
 
             if ($usersToNotRemove -contains $inputString) {
                 return $true
@@ -127,15 +126,17 @@ if (-not (IsAD)){
         try {
             
             # Revoke administrative privileges from users not in the admins list
-            $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name -notin $admins }
+            $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop| Where-Object { $_.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $admins }
             foreach ($admin in $allAdmins) {
                 $good = UserCheck $admin.Name
                 if ($good -eq $false) {
-                    if ($admin.Name.replace("$hostname\","") -notin $usersToRemove){
+                    if ($admin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $usersToRemove){
+
+                        $adminName = $admin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
 
                         Remove-LocalGroupMember -Group "Administrators" -Member $admin.Name
-                        Write-Host "Removed admin perms: $($admin.name)" -ForegroundColor Red
-                        "`nChanged Perms to standard for user: $($admin.name)" >> $logPath
+                        Write-Host "Removed admin perms: $adminName" -ForegroundColor Red
+                        "`nChanged Perms to standard for user: $adminName" >> $logPath
                     
                     }
                 }
@@ -154,18 +155,43 @@ if (-not (IsAD)){
 
                 $good = UserCheck $admin
                 if ($good -eq $false) {
-                    if ($admin.replace("$hostname\","") -notin $usersToRemove){
+                    if ($admin.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $usersToRemove){
 
-                        Add-LocalGroupMember -Group "Administrators" -Member $admin
-                        Write-Host "Added admin perms: $admin" -ForegroundColor Yellow
-                        "`nChanged Perms to Admin for user: $admin" >> $logPath
-
+                        # Check if user is already in Administrators group
+                        $cleanAdminName = $admin.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                        $isAlreadyAdmin = $false
+                        
+                        try {
+                            $currentAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+                            $isAlreadyAdmin = $currentAdmins | Where-Object { 
+                                $_.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -eq $cleanAdminName 
+                            }
+                        } catch {
+                            Write-Host "Could not check admin group membership for $admin" -ForegroundColor Gray
+                        }
+                        
+                        # Only add if not already admin
+                        if (-not $isAlreadyAdmin) {
+                            try {
+                                Add-LocalGroupMember -Group "Administrators" -Member $admin -ErrorAction Stop
+                                Write-Host "Added admin perms: $admin" -ForegroundColor Yellow
+                                "`nChanged Perms to Admin for user: $admin" >> $logPath
+                            } catch {
+                                if ($_.Exception.Message -like "*already a member*") {
+                                    Write-Host "Admin perms already correct: $admin" -ForegroundColor Green
+                                } else {
+                                    Write-Host "Failed to add admin perms for $admin : $($_.Exception.Message)" -ForegroundColor Red
+                                    "`nFailed to add admin perms for $admin : $($_.Exception.Message)" >> $logPath
+                                }
+                            }
+                        } else {
+                            Write-Host "Admin perms already correct: $admin" -ForegroundColor Green
+                        }
                     }
                 }
             }
-
             else {
-                Write-Host "$admin does not exist or is not a local user. (Ignore)"
+                Write-Host "$admin does not exist or is not a local user. (Ignore)" -ForegroundColor Gray
             }
         }
 
@@ -199,7 +225,7 @@ if (-not (IsAD)){
 }
 
 # Will set domain users based on the list provided | AI
-if ((IsAD)){
+if ((IsDC)){
 
     if (Config("set_domain_users")){
 
