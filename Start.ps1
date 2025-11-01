@@ -2257,7 +2257,7 @@ else{
             else{
 
                 # Im funny
-                if ($domainControllerTries -gt 10){
+                if ($domainControllerTries -gt 100){
                     
                     BuildSubTerminalText("Feel good about your self, could have done ANYTHING else `n but noooo just kept on clicking and clicking and clicking `n Go ahead, click anything to continue, see what happends.... `n Your not WORTHY of SecureTree")
                     "[" + (Get-CurrentTime) + "] $curuser is not worthy of SecureTree" >> $manLog
