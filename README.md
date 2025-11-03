@@ -6,8 +6,11 @@
 - THIS REPO WILL BE PUBLIC ONLY DURING THE COMPETITION, AND WILL BECOME PRIVATE WHEN NOT DOING COMP
 
 # IRSec
-- Its a blue teaming competitions, similar to Cyberpatriot
-- Difference is thats its more advance, lots more machines, and red teamer's are actively trying to break it
+- Its a blue teaming competitions, slightly to Cyberpatriot
+- Difference being Red team has full control of all machines and will be breaking every single one
+- SecureTree can only really delay the effects of red team
+- Also have to wright injects and reports on what happens
+
 
 ## Running the Start.ps1
 
