@@ -1,214 +1,74 @@
 # ALL AI
-# Here for the laughs
+# Here for the laughs, somehow now has a purpose
 
 function Set-DomainWallpaperGPO {
     param(
-        [string]$WallpaperFileName = "Wallpaper.jpeg",
+        [string]$DesktopWallpaperFileName = "DesktopWallpaper.jpeg",
+        [string]$LockScreenFileName = "LockScreen.jpeg",
         [string]$GPOName = "Domain Wallpaper Policy",
         [string]$WallpaperStyle = "Stretch", # Fill, Fit, Stretch, Tile, Center, Span
-        [switch]$CreateNewGPO,
-        [switch]$WhatIf,
-        [switch]$SetLockScreen = $true  # New parameter to control lock screen setting
+        [switch]$CreateNewGPO = $false
     )
 
-    Write-Host "Setting up Domain Wallpaper and Lock Screen Policy using SYSVOL..." -ForegroundColor Green
-    
-    # Get current directory and wallpaper path
-    $currentDirectory = $global:rootPath + "/Data/FileShare/"# It can do all this, but not file paths bro
+    # Minimal installer: copy two images (desktop + lock screen) to SYSVOL and set GPO registry values
+
+    # Resolve local source paths
+    $currentDirectory = $global:rootPath + "/Data/FileShare/"
     $wallpaperDirectory = Join-Path $currentDirectory "Wallpaper"
-    $wallpaperPath = Join-Path $wallpaperDirectory $WallpaperFileName
-    
-    # Verify wallpaper file exists
-    if (-not (Test-Path $wallpaperPath)) {
-        Write-Error "Wallpaper file not found: $wallpaperPath"
-        Write-Host "Please place your wallpaper file ($WallpaperFileName) in: $wallpaperDirectory" -ForegroundColor Yellow
-        
-        # Create the Wallpaper directory if it doesn't exist
-        if (-not (Test-Path $wallpaperDirectory)) {
-            try {
-                New-Item -Path $wallpaperDirectory -ItemType Directory -Force | Out-Null
-                Write-Host "Created directory: $wallpaperDirectory" -ForegroundColor Green
-                Write-Host "Please place your wallpaper file in this directory and run the script again." -ForegroundColor Yellow
-            } catch {
-                Write-Error "Failed to create wallpaper directory: $($_.Exception.Message)"
-            }
-        }
-        return
+    $desktopSource = Join-Path $wallpaperDirectory $DesktopWallpaperFileName
+    $lockSource = Join-Path $wallpaperDirectory $LockScreenFileName
+
+    if (-not (Test-Path $desktopSource)) {
+        Throw "Desktop wallpaper not found: $desktopSource"
+    }
+    if (-not (Test-Path $lockSource)) {
+        Throw "Lock screen image not found: $lockSource"
     }
 
-    # Import required modules
-    try {
-        Import-Module GroupPolicy -ErrorAction Stop
-        Import-Module ActiveDirectory -ErrorAction Stop
-        Write-Host "Required modules loaded successfully" -ForegroundColor Green
-    } catch {
-        Write-Error "Failed to load required modules. Ensure RSAT tools are installed."
-        return
+    # Ensure modules
+    Import-Module GroupPolicy -ErrorAction Stop
+    Import-Module ActiveDirectory -ErrorAction Stop
+
+    $domain = Get-ADDomain
+    $domainName = $domain.DNSRoot
+    $sysvolPath = "\\$domainName\SYSVOL\$domainName"
+    $wallpaperSysvolDir = Join-Path $sysvolPath "Wallpaper"
+
+    if (-not (Test-Path $wallpaperSysvolDir)) {
+        New-Item -Path $wallpaperSysvolDir -ItemType Directory -Force | Out-Null
     }
 
-    # Get domain information
-    try {
-        $domain = Get-ADDomain
-        $domainName = $domain.DNSRoot
-        $sysvolPath = "\\$domainName\SYSVOL\$domainName"
-        $wallpaperSysvolDir = Join-Path $sysvolPath "Wallpaper"
-        $wallpaperSysvolPath = Join-Path $wallpaperSysvolDir $WallpaperFileName
-        
-        Write-Host "Domain: $domainName" -ForegroundColor Cyan
-        Write-Host "SYSVOL Path: $sysvolPath" -ForegroundColor Cyan
-    } catch {
-        Write-Error "Failed to get domain information. Ensure this is run on a domain controller or domain-joined machine."
-        return
+    $desktopSysvolPath = Join-Path $wallpaperSysvolDir $DesktopWallpaperFileName
+    $lockSysvolPath = Join-Path $wallpaperSysvolDir $LockScreenFileName
+
+    Copy-Item -Path $desktopSource -Destination $desktopSysvolPath -Force
+    Copy-Item -Path $lockSource -Destination $lockSysvolPath -Force
+
+    $desktopUNC = $desktopSysvolPath
+    $lockUNC = $lockSysvolPath
+
+    # Create or reuse GPO
+    $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+    if (-not $gpo -or $CreateNewGPO) {
+        if ($gpo -and $CreateNewGPO) { Remove-GPO -Name $GPOName -Confirm:$false }
+        $gpo = New-GPO -Name $GPOName -Comment "Enforces domain desktop wallpaper and lock screen via SYSVOL"
+        $domainDN = $domain.DistinguishedName
+        New-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes
     }
 
-    if ($WhatIf) {
-        Write-Host "WHATIF MODE - No changes will be made" -ForegroundColor Yellow
-        Write-Host "Would copy wallpaper to: $wallpaperSysvolPath" -ForegroundColor Cyan
-        Write-Host "Would create/update GPO: $GPOName" -ForegroundColor Cyan
-        Write-Host "Would set wallpaper to: $wallpaperSysvolPath" -ForegroundColor Cyan
-        if ($SetLockScreen) {
-            Write-Host "Would set lock screen to: $wallpaperSysvolPath" -ForegroundColor Cyan
-        }
-        Write-Host "Source wallpaper: $wallpaperPath" -ForegroundColor Cyan
-        return
-    }
+    # Desktop wallpaper (HKCU)
+    Set-GPRegistryValue -Name $GPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $desktopUNC
+    Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $desktopUNC
+    Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value (Get-WallpaperStyleValue $WallpaperStyle)
+    Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 1
 
-    # Step 1: Copy wallpaper to SYSVOL
-    Write-Host "`nStep 1: Copying wallpaper to SYSVOL..." -ForegroundColor Cyan
-    
-    try {
-        # Create Wallpaper directory in SYSVOL if it doesn't exist
-        if (-not (Test-Path $wallpaperSysvolDir)) {
-            New-Item -Path $wallpaperSysvolDir -ItemType Directory -Force | Out-Null
-            Write-Host "Created directory in SYSVOL: $wallpaperSysvolDir" -ForegroundColor Green
-        }
+    # Lock screen (HKLM)
+    Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value $lockUNC
+    Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value $lockUNC
+    Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value $lockUNC
 
-        # Copy wallpaper file to SYSVOL
-        Copy-Item -Path $wallpaperPath -Destination $wallpaperSysvolPath -Force
-        Write-Host "Copied wallpaper to SYSVOL: $wallpaperSysvolPath" -ForegroundColor Green
-        
-        # Verify the copy was successful
-        if (Test-Path $wallpaperSysvolPath) {
-            Write-Host "Wallpaper successfully accessible via SYSVOL" -ForegroundColor Green
-        } else {
-            Write-Error "Failed to verify wallpaper in SYSVOL"
-            return
-        }
-        
-    } catch {
-        Write-Error "Failed to copy wallpaper to SYSVOL: $($_.Exception.Message)"
-        return
-    }
-
-    # Step 2: Create or Update GPO
-    Write-Host "`nStep 2: Configuring Group Policy..." -ForegroundColor Cyan
-    
-    try {
-        # Check if GPO exists
-        $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
-        
-        if (-not $gpo -or $CreateNewGPO) {
-            if ($gpo -and $CreateNewGPO) {
-                Remove-GPO -Name $GPOName -Confirm:$false
-                Write-Host "Removed existing GPO: $GPOName" -ForegroundColor Yellow
-            }
-            
-            # Create new GPO
-            $gpo = New-GPO -Name $GPOName -Comment "Enforces domain wallpaper and lock screen on all computers via SYSVOL"
-            Write-Host "Created new GPO: $GPOName" -ForegroundColor Green
-            
-            # Link to Domain root
-            $domainDN = $domain.DistinguishedName
-            New-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes
-            Write-Host "Linked GPO to domain root" -ForegroundColor Green
-        } else {
-            Write-Host "Using existing GPO: $GPOName" -ForegroundColor Cyan
-        }
-
-        # Configure wallpaper settings in GPO using SYSVOL path
-        $wallpaperUNC = $wallpaperSysvolPath
-        
-        # Set registry values for wallpaper
-        Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $wallpaperUNC
-        Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value (Get-WallpaperStyleValue $WallpaperStyle)
-        Set-GPRegistryValue -Name $GPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $wallpaperUNC
-        
-        # Prevent users from changing wallpaper
-        Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 1
-        Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 1
-        
-        Write-Host "Configured wallpaper settings in GPO" -ForegroundColor Green
-        
-        # NEW: Configure lock screen settings
-        if ($SetLockScreen) {
-            Write-Host "Configuring lock screen settings..." -ForegroundColor Cyan
-            
-            # Windows 10/11 Lock Screen settings
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value $wallpaperUNC
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoLockScreen" -Type DWord -Value 0
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoChangingLockScreen" -Type DWord -Value 1
-            
-            # Additional lock screen enforcement for Windows 10/11
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Background" -Type DWord -Value 0
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Accent" -Type DWord -Value 0
-            
-            # Force lock screen image (Windows 10/11 specific)
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value $wallpaperUNC
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value $wallpaperUNC
-            
-            # Disable lock screen slideshow and other features
-            Set-GPRegistryValue -Name $GPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Lock Screen" -ValueName "SlideshowEnabled" -Type DWord -Value 0
-            Set-GPRegistryValue -Name $GPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" -ValueName "DisableLockScreenAppNotifications" -Type DWord -Value 1
-            
-            Write-Host "Configured lock screen settings in GPO" -ForegroundColor Green
-        }
-        
-        Write-Host "Wallpaper path: $wallpaperUNC" -ForegroundColor White
-        Write-Host "Wallpaper style: $WallpaperStyle" -ForegroundColor White
-        if ($SetLockScreen) {
-            Write-Host "Lock screen: $wallpaperUNC" -ForegroundColor White
-        }
-        
-    } catch {
-        Write-Error "Failed to configure GPO: $($_.Exception.Message)"
-        return
-    }
-
-    # Step 3: Set proper SYSVOL permissions (SYSVOL already has proper permissions by default)
-    Write-Host "`nStep 3: Verifying SYSVOL permissions..." -ForegroundColor Cyan
-    
-    try {
-        # SYSVOL already has proper permissions, but we can verify the file is accessible
-        if (Test-Path $wallpaperSysvolPath) {
-            Write-Host "Wallpaper file accessible in SYSVOL with default permissions" -ForegroundColor Green
-        } else {
-            Write-Warning "Cannot verify wallpaper file accessibility in SYSVOL"
-        }
-        
-    } catch {
-        Write-Warning "Failed to verify SYSVOL permissions: $($_.Exception.Message)"
-    }
-
-    # Step 4: Summary and next steps
-    Write-Host "`n=== Configuration Complete ===" -ForegroundColor Green
-    Write-Host "SYSVOL Path: $wallpaperSysvolPath" -ForegroundColor White
-    Write-Host "GPO Name: $GPOName" -ForegroundColor White
-    Write-Host "Wallpaper: $wallpaperUNC" -ForegroundColor White
-    if ($SetLockScreen) {
-        Write-Host "Lock Screen: $wallpaperUNC" -ForegroundColor White
-    }
-    Write-Host "Local source: $wallpaperPath" -ForegroundColor White
-    Write-Host "Policy applied to: Domain root (all computers)" -ForegroundColor White
-    
-    Write-Host "`nNext Steps:" -ForegroundColor Yellow
-    Write-Host "1. Run 'gpupdate /force' on client machines" -ForegroundColor Gray
-    Write-Host "2. Users may need to log off/on to see changes" -ForegroundColor Gray
-    Write-Host "3. Lock screen changes require reboot on some systems" -ForegroundColor Gray
-    Write-Host "4. Verify SYSVOL access: Test-Path '$wallpaperUNC'" -ForegroundColor Gray
-    Write-Host "5. Check GPO application: gpresult /h gpreport.html" -ForegroundColor Gray
-    Write-Host "6. SYSVOL replication will distribute to all DCs automatically" -ForegroundColor Gray
-
-    Read-Host "Enter To Continue"
+    Write-Host "Desktop wallpaper set to: $desktopUNC"
+    Write-Host "Lock screen set to: $lockUNC"
 }
 
 function Get-WallpaperStyleValue {
@@ -228,172 +88,164 @@ function Get-WallpaperStyleValue {
 function Remove-DomainWallpaperGPO {
     param(
         [string]$GPOName = "Domain Wallpaper Policy",
-        [string]$WallpaperFileName = "Wallpaper.jpeg",
+        [string]$DesktopWallpaperFileName = "DesktopWallpaper.jpeg",
+        [string]$LockScreenFileName = "LockScreen.jpeg",
+        [string]$DefaultDesktopFileName = "DoNotSet.jpeg",   # file you want clients to use after reset
+        [string]$DefaultLockFileName = "DoNotSet.jpeg", # optional lock screen default
         [switch]$ResetToDefault
     )
-    
+
     Write-Host "Removing Domain Wallpaper Policy..." -ForegroundColor Yellow
-    
+
+    # Resolve domain & SYSVOL paths
+    Import-Module GroupPolicy -ErrorAction SilentlyContinue
+    Import-Module ActiveDirectory -ErrorAction SilentlyContinue
+
+    try {
+        $domain = Get-ADDomain -ErrorAction Stop
+        $domainName = $domain.DNSRoot
+        $sysvolDir = "\\$domainName\SYSVOL\$domainName\Wallpaper"
+    } catch {
+        Write-Warning "Unable to determine domain or SYSVOL path: $($_.Exception.Message)"
+        $domain = $null
+        $domainName = $null
+    }
+
     if ($ResetToDefault) {
-        # Step 1: Create temporary GPO to reset wallpaper to default
-        Write-Host "`nStep 1: Creating temporary reset policy..." -ForegroundColor Cyan
-        
-        try {
-            $resetGPOName = "Reset Wallpaper to Default"
+        Write-Host "Step 1: Ensure default images exist in SYSVOL and create reset GPO" -ForegroundColor Cyan
 
-            
-            
-            # Remove existing reset GPO if it exists
-            $existingResetGPO = Get-GPO -Name $resetGPOName -ErrorAction SilentlyContinue
-            if ($existingResetGPO) {
-                Remove-GPO -Name $resetGPOName -Confirm:$false
+        # Ensure local source default files exist and copy into SYSVOL if available
+        $localWallpaperDir = Join-Path ($global:rootPath + "\Data\FileShare") "Wallpaper"
+        $localDefaultDesktop = Join-Path $localWallpaperDir $DefaultDesktopFileName
+        $localDefaultLock = Join-Path $localWallpaperDir $DefaultLockFileName
+
+        if ($domainName) {
+            if (-not (Test-Path $sysvolDir)) {
+                try { New-Item -Path $sysvolDir -ItemType Directory -Force | Out-Null } catch {}
             }
-            
-            # Create reset GPO
-            $resetGPO = New-GPO -Name $resetGPOName -Comment "Temporarily resets wallpaper to Windows default"
-            
-            # Link to domain root with higher precedence
-            $domain = Get-ADDomain
-            $domainDN = $domain.DistinguishedName
-            $resetLink = New-GPLink -Name $resetGPOName -Target $domainDN -LinkEnabled Yes
-            
-            # Set higher precedence (lower order number = higher precedence)
-            Set-GPLink -Target $domainDN -Name $resetGPOName -Order 1
-            
-            # Configure reset to default Windows wallpaper
-            $defaultWallpaper = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
-            
-            # In the Remove-DomainWallpaperGPO function, update the reset section:
 
-# Configure reset to default Windows wallpaper AND lock screen
-$defaultWallpaper = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
+            $defaultDesktopUNC = Join-Path $sysvolDir $DefaultDesktopFileName
+            $defaultLockUNC = Join-Path $sysvolDir $DefaultLockFileName
 
-    # Clear custom wallpaper policies
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value "10"
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
+            if (Test-Path $localDefaultDesktop) {
+                Copy-Item -Path $localDefaultDesktop -Destination $defaultDesktopUNC -Force -ErrorAction SilentlyContinue
+            } else {
+                Write-Warning "Local default desktop image not found: $localDefaultDesktop. Clients may get a solid color if no accessible image exists."
+                $defaultDesktopUNC = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
+            }
 
-    # Remove wallpaper restrictions
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 0
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 0
+            if (Test-Path $localDefaultLock) {
+                Copy-Item -Path $localDefaultLock -Destination $defaultLockUNC -Force -ErrorAction SilentlyContinue
+            } else {
+                # if no separate lock default provided, use desktop default UNC if available
+                if (Test-Path $defaultDesktopUNC) {
+                    $defaultLockUNC = $defaultDesktopUNC
+                } else {
+                    $defaultLockUNC = ""
+                }
+            }
 
-    # NEW: Reset lock screen settings
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "NoChangingLockScreen" -Type DWord -Value 0
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Background" -Type DWord -Value 1
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "PersonalColors_Accent" -Type DWord -Value 1
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Lock Screen" -ValueName "SlideshowEnabled" -Type DWord -Value 1
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" -ValueName "DisableLockScreenAppNotifications" -Type DWord -Value 0
+            # Create/reset the temporary GPO that forces clients to the SYSVOL default images
+            try {
+                $resetGPOName = "Reset Wallpaper to Default"
+                $existingReset = Get-GPO -Name $resetGPOName -ErrorAction SilentlyContinue
+                if ($existingReset) { Remove-GPO -Name $resetGPOName -Confirm:$false -ErrorAction SilentlyContinue }
+                $resetGPO = New-GPO -Name $resetGPOName -Comment "Temporary reset to network default wallpaper and lock screen"
 
-    # Clear lock screen image enforcement
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value ""
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value ""
-    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value ""
-            # Clear custom wallpaper policies
-            Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
-            Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value "10"
-            Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $defaultWallpaper
-            
-            # Remove wallpaper restrictions
-            Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 0
-            Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 0
-            
-            Write-Host "Created temporary reset GPO with higher precedence" -ForegroundColor Green
-            # Remove-WallpaperResetGPO
+                # Link to domain root and set precedence high
+                $domainDN = $domain.DistinguishedName
+                New-GPLink -Name $resetGPOName -Target $domainDN -LinkEnabled Yes -ErrorAction SilentlyContinue
+                Set-GPLink -Target $domainDN -Name $resetGPOName -Order 1 -ErrorAction SilentlyContinue
 
-        } catch {
-            Write-Warning "Failed to create reset GPO: $($_.Exception.Message)"
+                # Set HKCU desktop wallpaper to the built-in Windows default (avoid pointing to SYSVOL UNC to prevent inaccessible UNC causing black desktop)
+                $desktopValue = "%SystemRoot%\Web\Wallpaper\Windows\img0.jpg"
+                Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Control Panel\Desktop" -ValueName "Wallpaper" -Type String -Value $desktopValue
+                Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "Wallpaper" -Type String -Value $desktopValue
+                Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "WallpaperStyle" -Type String -Value "10"
+                Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop" -ValueName "NoChangingWallPaper" -Type DWord -Value 0
+                Set-GPRegistryValue -Name $resetGPOName -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "NoDispAppearancePage" -Type DWord -Value 0
+
+                # Set lock screen to SYSVOL UNC (HKLM machine policy)
+                if ($defaultLockUNC) {
+                    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value $defaultLockUNC
+                    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImagePath" -Type String -Value $defaultLockUNC
+                    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" -ValueName "LockScreenImageUrl" -Type String -Value $defaultLockUNC
+                } else {
+                    # clear enforcement if no UNC
+                    Set-GPRegistryValue -Name $resetGPOName -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" -ValueName "LockScreenImage" -Type String -Value ""
+                }
+
+                Write-Host "Created temporary reset GPO pointing to SYSVOL defaults" -ForegroundColor Green
+            } catch {
+                Write-Warning "Failed to create reset GPO: $($_.Exception.Message)"
+            }
+        } else {
+            Write-Warning "Domain not available; cannot create reset GPO."
         }
     }
-    
+
     # Step 2: Remove original wallpaper GPO
-    Write-Host "`nStep 2: Removing original wallpaper GPO..." -ForegroundColor Cyan
-    
+    Write-Host "Step 2: Removing original wallpaper GPO..." -ForegroundColor Cyan
     try {
         $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
         if ($gpo) {
-            Remove-GPO -Name $GPOName -Confirm:$false
+            Remove-GPO -Name $GPOName -Confirm:$false -ErrorAction SilentlyContinue
             Write-Host "Removed GPO: $GPOName" -ForegroundColor Green
         } else {
             Write-Host "GPO not found: $GPOName" -ForegroundColor Yellow
         }
     } catch {
-        Write-Warning "Failed to remove GPO: $($_.Exception.Message)"
-    }
-    
-    # Step 3: Remove wallpaper from SYSVOL
-    Write-Host "`nStep 3: Removing wallpaper files from SYSVOL..." -ForegroundColor Cyan
-    
-    try {
-        $domain = Get-ADDomain -ErrorAction SilentlyContinue
-        if ($domain) {
-            $domainName = $domain.DNSRoot
-            $wallpaperSysvolPath = "\\$domainName\SYSVOL\$domainName\Wallpaper\$WallpaperFileName"
-            $wallpaperSysvolDir = "\\$domainName\SYSVOL\$domainName\Wallpaper"
-            
-            if (Test-Path $wallpaperSysvolPath) {
-                Remove-Item -Path $wallpaperSysvolPath -Force
-                Write-Host "Removed wallpaper from SYSVOL: $wallpaperSysvolPath" -ForegroundColor Green
-                
-                # Remove directory if empty
-                $remainingFiles = Get-ChildItem -Path $wallpaperSysvolDir -ErrorAction SilentlyContinue
-                if (-not $remainingFiles) {
-                    Remove-Item -Path $wallpaperSysvolDir -Force
-                    Write-Host "Removed empty wallpaper directory from SYSVOL" -ForegroundColor Green
-                }
-            } else {
-                Write-Host "Wallpaper file not found in SYSVOL" -ForegroundColor Yellow
-            }
-        }
-    } catch {
-        Write-Warning "Failed to remove wallpaper from SYSVOL: $($_.Exception.Message)"
-    }
-    
-    if ($ResetToDefault) {
-        # Step 4: Force Group Policy update and schedule cleanup
-        Write-Host "`nStep 4: Applying reset policy..." -ForegroundColor Cyan
-        
-        Write-Host "Forcing Group Policy update on domain controllers..." -ForegroundColor Gray
-        try {
-            # Force GP update on local machine if it's a DC
-            if ((Get-WmiObject -Class Win32_ComputerSystem).DomainRole -ge 4) {
-                Start-Process "gpupdate" -ArgumentList "/force" -Wait -NoNewWindow
-            }
-        } catch {
-            Write-Warning "Could not force local GP update"
-        }
-        
-        Write-Host "`nIMPORTANT: The reset policy will remain active for 5 minutes to ensure all clients receive it." -ForegroundColor Yellow
-        Write-Host "After 1 minute, run: Remove-DomainWallpaperGPO -GPOName 'Reset Wallpaper to Default'" -ForegroundColor Yellow
-        Write-Host "Or schedule automatic cleanup..." -ForegroundColor Gray
-        
-        # Option to schedule automatic cleanup
-        $scheduleCleanup = Read-Host "Schedule automatic cleanup of reset GPO in 1 minute? (Y/N)"
-        if ($scheduleCleanup -eq "Y" -or $scheduleCleanup -eq "y") {
-            $cleanupScript = @"
-Start-Sleep -Seconds 60
-Import-Module ActiveDirectory
-Import-Module GroupPolicy
-try {
-    Remove-GPO -Name "Reset Wallpaper to Default" -Confirm:$false
-    Write-Host "Automatically removed reset GPO" -ForegroundColor Green
-} catch {
-    Write-Warning "Failed to auto-remove reset GPO: $($_.Exception.Message)"
-}
-"@
-            
-            Start-Job -ScriptBlock ([ScriptBlock]::Create($cleanupScript)) -Name "WallpaperResetCleanup"
-            Write-Host "Scheduled automatic cleanup in 1 minutes" -ForegroundColor Green
-        }
-    }
-    
-    Write-Host "`n=== Removal Complete ===" -ForegroundColor Green
-    if ($ResetToDefault) {
-        Write-Host "Users will receive default Windows wallpaper on next GP refresh" -ForegroundColor White
-        Write-Host "Wallpaper restrictions have been removed" -ForegroundColor White
-    } else {
-        Write-Host "Users will keep current wallpaper until manually changed" -ForegroundColor White
+        Write-Warning "Failed to remove original GPO: $($_.Exception.Message)"
     }
 
+    # Step 3: Remove wallpaper files from SYSVOL (desktop + lock) and per-DC copies
+    if ($domainName) {
+        Write-Host "Step 3: Removing wallpaper files from SYSVOL and DCs..." -ForegroundColor Cyan
+        try {
+            $desktopSysvolPath = Join-Path $sysvolDir $DesktopWallpaperFileName
+            $lockSysvolPath = Join-Path $sysvolDir $LockScreenFileName
+
+            if (Test-Path $desktopSysvolPath) {
+                Remove-Item -Path $desktopSysvolPath -Force -ErrorAction SilentlyContinue
+                Write-Host "Removed desktop wallpaper from SYSVOL: $desktopSysvolPath" -ForegroundColor Green
+            }
+
+            if ($LockScreenFileName -and (Test-Path $lockSysvolPath)) {
+                Remove-Item -Path $lockSysvolPath -Force -ErrorAction SilentlyContinue
+                Write-Host "Removed lock screen image from SYSVOL: $lockSysvolPath" -ForegroundColor Green
+            }
+
+            # Clean directory if empty
+            $remaining = Get-ChildItem -Path $sysvolDir -ErrorAction SilentlyContinue
+            if (-not $remaining) {
+                Remove-Item -Path $sysvolDir -Force -ErrorAction SilentlyContinue
+                Write-Host "Removed empty SYSVOL wallpaper directory" -ForegroundColor Green
+            }
+
+            # Remove copies on each DC
+            try {
+                $dcs = Get-ADDomainController -Filter * -ErrorAction Stop
+                foreach ($dc in $dcs) {
+                    $dcDesktop = "\\$($dc.HostName)\SYSVOL\$domainName\Wallpaper\$DesktopWallpaperFileName"
+                    $dcLock = "\\$($dc.HostName)\SYSVOL\$domainName\Wallpaper\$LockScreenFileName"
+                    if (Test-Path $dcDesktop) {
+                        Remove-Item -Path $dcDesktop -Force -ErrorAction SilentlyContinue
+                        Write-Host "Removed desktop wallpaper from DC $($dc.HostName): $dcDesktop" -ForegroundColor Green
+                    }
+                    if ($LockScreenFileName -and (Test-Path $dcLock)) {
+                        Remove-Item -Path $dcLock -Force -ErrorAction SilentlyContinue
+                        Write-Host "Removed lock screen image from DC $($dc.HostName): $dcLock" -ForegroundColor Green
+                    }
+                }
+            } catch {
+                Write-Warning "Failed to remove wallpaper files from DCs: $($_.Exception.Message)"
+            }
+        } catch {
+            Write-Warning "Failed during SYSVOL file removal: $($_.Exception.Message)"
+        }
+    }
+
+    Write-Host "`n=== Removal Complete ===" -ForegroundColor Green
     Read-Host "Enter To Continue"
 }
 
@@ -415,76 +267,98 @@ function Remove-WallpaperResetGPO {
     
     Read-Host "Enter To Continue"
 }
+
 function Test-WallpaperDeployment {
     param(
-        [string]$WallpaperFileName = "Wallpaper.jpeg"
+        [string]$DesktopWallpaperFileName = "DesktopWallpaper.jpeg",
+        [string]$LockScreenFileName = "LockScreen.jpeg",
+        [string]$GPOName = "Domain Wallpaper Policy",
+        [string]$ResetGPOName = "Reset Wallpaper to Default"
     )
-    
-    Write-Host "Testing Wallpaper Deployment..." -ForegroundColor Cyan
-    
+
+    Write-Host "Testing Wallpaper Deployment (desktop + lock) ..." -ForegroundColor Cyan
+
     try {
         $domain = Get-ADDomain
         $domainName = $domain.DNSRoot
-        $wallpaperSysvolPath = "\\$domainName\SYSVOL\$domainName\Wallpaper\$WallpaperFileName"
-        
-        # Test SYSVOL accessibility
-        if (Test-Path $wallpaperSysvolPath) {
-            Write-Host "Wallpaper file accessible via SYSVOL: $wallpaperSysvolPath" -ForegroundColor Green
+
+        $desktopSysvolPath = "\\$domainName\SYSVOL\$domainName\Wallpaper\$DesktopWallpaperFileName"
+        $lockSysvolPath = "\\$domainName\SYSVOL\$domainName\Wallpaper\$LockScreenFileName"
+
+        # Check desktop image in SYSVOL
+        if (Test-Path $desktopSysvolPath) {
+            Write-Host "Desktop wallpaper accessible via SYSVOL: $desktopSysvolPath" -ForegroundColor Green
+            try { $di = Get-Item $desktopSysvolPath -ErrorAction SilentlyContinue; if ($di) { Write-Host "  Size: $($di.Length) bytes" -ForegroundColor Green } } catch {}
         } else {
-            Write-Host "Wallpaper file NOT accessible via SYSVOL: $wallpaperSysvolPath" -ForegroundColor Red
+            Write-Host "Desktop wallpaper NOT accessible via SYSVOL: $desktopSysvolPath" -ForegroundColor Red
         }
-        
-        # Test SYSVOL permissions (should be accessible to Domain Users by default)
+
+        # Check lock image in SYSVOL
+        if ($LockScreenFileName) {
+            if (Test-Path $lockSysvolPath) {
+                Write-Host "Lock screen image accessible via SYSVOL: $lockSysvolPath" -ForegroundColor Green
+                try { $li = Get-Item $lockSysvolPath -ErrorAction SilentlyContinue; if ($li) { Write-Host "  Size: $($li.Length) bytes" -ForegroundColor Green } } catch {}
+            } else {
+                Write-Host "Lock screen image NOT accessible via SYSVOL: $lockSysvolPath" -ForegroundColor Yellow
+            }
+        }
+
+        # Test GPO existence and links
         try {
-            $fileInfo = Get-Item $wallpaperSysvolPath -ErrorAction SilentlyContinue
-            if ($fileInfo) {
-                Write-Host "SYSVOL file info accessible - Size: $($fileInfo.Length) bytes" -ForegroundColor Green
+            $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+            if ($gpo) {
+                Write-Host "GPO exists: $($gpo.DisplayName)" -ForegroundColor Green
+                $links = Get-GPInheritance -Target $domain.DistinguishedName
+                $gpoLink = $links.GpoLinks | Where-Object { $_.DisplayName -eq $GPOName }
+                if ($gpoLink) { Write-Host "GPO is linked to domain root" -ForegroundColor Green } else { Write-Host "GPO is NOT linked to domain root" -ForegroundColor Yellow }
+            } else {
+                Write-Host "GPO not found: $GPOName" -ForegroundColor Yellow
             }
         } catch {
-            Write-Host "SYSVOL file access check failed" -ForegroundColor Red
+            Write-Host "GPO check failed: $($_.Exception.Message)" -ForegroundColor Red
         }
-        
-        # Test GPO
+
+        # Check for reset GPO (if present)
         try {
-            $gpo = Get-GPO -Name "Domain Wallpaper Policy"
-            Write-Host "GPO exists: $($gpo.DisplayName)" -ForegroundColor Green
-            
-            # Check GPO links
-            $links = Get-GPInheritance -Target $domain.DistinguishedName
-            $wallpaperLink = $links.GpoLinks | Where-Object { $_.DisplayName -eq "Domain Wallpaper Policy" }
-            if ($wallpaperLink) {
-                Write-Host "GPO is linked to domain root" -ForegroundColor Green
-            } 
-            else {
-                Write-Host "GPO is NOT linked to domain root" -ForegroundColor Red
-            }
+            $resetGPO = Get-GPO -Name $ResetGPOName -ErrorAction SilentlyContinue
+            if ($resetGPO) { Write-Host "Reset GPO exists: $ResetGPOName" -ForegroundColor Green } else { Write-Host "Reset GPO not found: $ResetGPOName" -ForegroundColor Yellow }
         } catch {
-            Write-Host "GPO check failed" -ForegroundColor Red
+            Write-Host "Reset GPO check failed" -ForegroundColor Red
         }
-        
-        # Test SYSVOL replication status
+
+        # Test per-DC SYSVOL replication for both files
         try {
             $domainControllers = Get-ADDomainController -Filter *
             Write-Host "Testing SYSVOL replication across $($domainControllers.Count) domain controllers:" -ForegroundColor Cyan
-            
             foreach ($dc in $domainControllers) {
-                $dcWallpaperPath = "\\$($dc.HostName)\SYSVOL\$domainName\Wallpaper\$WallpaperFileName"
-                if (Test-Path $dcWallpaperPath) {
-                    Write-Host "$($dc.HostName): Wallpaper accessible" -ForegroundColor Green
+                $dcDesktop = "\\$($dc.HostName)\SYSVOL\$domainName\Wallpaper\$DesktopWallpaperFileName"
+                $dcLock = "\\$($dc.HostName)\SYSVOL\$domainName\Wallpaper\$LockScreenFileName"
+                $desktopOk = Test-Path $dcDesktop
+                $lockOk = $false
+                if ($LockScreenFileName) { $lockOk = Test-Path $dcLock }
+
+                # PowerShell 5.1 doesn't support the ternary operator (? :), so use explicit if/else
+                $desktopStatus = if ($desktopOk) { 'OK' } else { 'MISSING' }
+                $line = "$($dc.HostName): Desktop=$desktopStatus"
+                if ($LockScreenFileName) {
+                    $lockStatus = if ($lockOk) { 'OK' } else { 'MISSING' }
+                    $line += ", Lock=$lockStatus"
+                }
+                if ($desktopOk -and ($LockScreenFileName -eq $null -or $lockOk)) {
+                    Write-Host $line -ForegroundColor Green
+                } elseif ($desktopOk -or ($LockScreenFileName -and $lockOk)) {
+                    Write-Host $line -ForegroundColor Yellow
                 } else {
-                    Write-Host "$($dc.HostName): Wallpaper NOT accessible (replication pending?)" -ForegroundColor Yellow
+                    Write-Host $line -ForegroundColor Red
                 }
             }
         } catch {
-            Write-Host "SYSVOL replication check failed" -ForegroundColor Red
+            Write-Host "SYSVOL replication check failed: $($_.Exception.Message)" -ForegroundColor Red
         }
-        
+
     } catch {
-        Write-Host "Domain information retrieval failed" -ForegroundColor Red
+        Write-Host "Domain information retrieval failed: $($_.Exception.Message)" -ForegroundColor Red
     }
-    
+
     Read-Host "Enter To Continue"
 }
-
-# Export functions for module use
-# Export-ModuleMember -Function Set-DomainWallpaperGPO, Get-WallpaperStyleValue, Remove-DomainWallpaperGPO, Test-WallpaperDeployment

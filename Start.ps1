@@ -15,19 +15,19 @@
 Set-Location -Path "$PSScriptRoot"
 
 # Most of the main Function for the StartScript
-Import-Module -Name "./Data/StartFunctions/StartFunctions"
+Import-Module -Name "./Data/StartFunctions/StartFunctions" -Force
 
 # Common Functions that are used in all of the scripts
-Import-Module -Name "./Data/CommonFunctions/CommonFunctions"
+Import-Module -Name "./Data/CommonFunctions/CommonFunctions" -Force
 
 # This is only here because I want some cool frames around the text
-Import-Module -Name "./Data/FrameBuilder/FrameBuilder"
+Import-Module -Name "./Data/FrameBuilder/FrameBuilder" -Force
 
 # Allows search of prohibited file
-Import-Module -Name "./Data/FileFinder/FileFinder"
+Import-Module -Name "./Data/FileFinder/FileFinder" -Force
 
 # Wallpaper stuff :)
-Import-Module -Name "./Data/FileShare/FileShare"
+Import-Module -Name "./Data/FileShare/FileShare" -Force
 
 # Set the terminal screen size to 138 columns and 36 rows
 [System.Console]::WindowWidth = 138
@@ -111,7 +111,7 @@ $env:SecureTree_CurUser = $curuser
 $env:SecureTree_ComputerName = $computerName
 $env:SecureTree_RootPath = $rootPath
 
-# Pretend you don't see this
+# Pretend you don't see this red team :)
 $global:scriptDefaultPassword = ConvertTo-SecureString "Cybersecurity" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
 # -----------------------------------------
