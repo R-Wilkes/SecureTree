@@ -417,3 +417,45 @@ function PassesPasswordPolicy {
     }
 }
 
+# Givin a password will check if is blank or not and will return script default if it is
+function CheckPasswordDefault{
+    [OutputType([System.Security.SecureString])]
+    param(
+        [Parameter(Mandatory=$true)]
+        [System.Security.SecureString]$TestPass
+    )
+
+    # Don't know if this is safe, but oh well
+    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($TestPass)
+    $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+    # If the password is nothing
+    if ($TestPass -eq "" -or $plainPassword -eq ""){
+
+        BuildSubTerminalText -Text "Setting password to script default"
+        # "[" + (Get-CurrentTime) + "] Setting password for $who to script default" >> $manLog
+
+        $plainPassword = $null
+        return $global:scriptDefaultPassword
+
+    }
+
+    # If it does not pass the password tests
+    elseif (-not (PassesPasswordPolicy -TestPass $plainPassword)){
+
+        BuildSubTerminalText -Text "Password does not meet password policy requirements"
+        $plainPassword = $null
+        
+        return $null
+
+    }
+
+    else{
+
+        $plainPassword = $null
+        return $TestPass
+
+    }
+}
+

@@ -112,7 +112,7 @@ $env:SecureTree_ComputerName = $computerName
 $env:SecureTree_RootPath = $rootPath
 
 # Pretend you don't see this red team :)
-$global:scriptDefaultPassword = ConvertTo-SecureString "Cybersecurity" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
+$global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules69" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
 # -----------------------------------------
 
@@ -344,179 +344,412 @@ else{
 
             While ($true){
 
-                $choice = BuildSubOptionFrame(" 1) Edit Local Users `n 2) Edit Domain Users `n 3) Exit")
+                $optionOneText = if (IsDC) {"Edit Remote Local Users"} else {"Edit Local Users"} 
 
-                # Edits local users if not on AD
+                $choice = BuildSubOptionFrame(" 1) $optionOneText `n 2) Edit Domain Users `n 3) Exit")
+
+                # Edits local or remote users
                 if ($choice -eq "1"){
-
-                    "[" + (Get-CurrentTime) + "] $curuser Entered Local User Configuration" >> $manLog
-
-                    # Another menu that will allow you to edit users, edit groups, add users, add groups
-                    While ($True) {
-
-                        ScreenClear
-                        
-                        $editInput = BuildSubOptionFrame(" 1) Edit Users `n 2) Edit Groups `n 3) Add Users `n 4) Add Groups `n 5) Exit")
                     
-                        # Edit Users
-                        if ($editInput -eq "1") {
+                    # Edit local users
+                    if (-not (IsDC)){
 
-                            # Adds to the manual log
-                            "[" + (Get-CurrentTime) + "] $curuser Entered User Edit Mode" >> $manLog
+                        "[" + (Get-CurrentTime) + "] $curuser Entered Local User Configuration" >> $manLog
 
-                            :editUsers While ($True) {
+                        # Another menu that will allow you to edit users, edit groups, add users, add groups
+                        While ($True) {
 
-                                ScreenClear
+                            ScreenClear
+                            
+                            $editInput = BuildSubOptionFrame(" 1) Edit Users `n 2) Edit Groups `n 3) Add Users `n 4) Add Groups `n 5) Exit")
+                        
+                            # Edit Users
+                            if ($editInput -eq "1") {
+
+                                # Adds to the manual log
+                                "[" + (Get-CurrentTime) + "] $curuser Entered User Edit Mode" >> $manLog
+
+                                :editUsers While ($True) {
+
+                                    ScreenClear
+                    
+                                    $b = (((Get-LocalGroupMember -Group "Administrators").name).Replace("$computerName", "")).Replace("\" , "").Replace("NT AUTHORITY", "").Replace("$($computerName.ToUpper())", "")
+                                    $a = (((Get-LocalGroupMember -Group "Users").name).Replace("$computerName", "")).Replace("\" , "").Replace("NT AUTHORITY", "").Replace("$($computerName.ToUpper())", "")
+                                    
+                                    $users = $b + $a
                 
-                                $b = (((Get-LocalGroupMember -Group "Administrators").name).Replace("$computerName", "")).Replace("\" , "").Replace("NT AUTHORITY", "").Replace("$($computerName.ToUpper())", "")
-                                $a = (((Get-LocalGroupMember -Group "Users").name).Replace("$computerName", "")).Replace("\" , "").Replace("NT AUTHORITY", "").Replace("$($computerName.ToUpper())", "")
+                                    # Turns the array into the string that the BuildSubOptionFrame can work with
+                                    $userString = FormatArrayToString -Array $users
+
+                                    # Chooses the user you want to edit
+                                    $userInput = BuildSubOptionFrame($userString)
+
+
+                                    # Encase you want to exit, only custom to the users part
+                                    if ($userInput -eq ($users.Length + 1)){
+
+                                        # Adds to the manual log
+                                        "[" + (Get-CurrentTime) + "] $curuser Exited User Edit Mode" >> $manLog
+                                        break 
+
+                                    }
+
+                                    $who = ($users[$userInput - 1])
+
+                                    # The options of the users
+                                    While ($True) {
+
+                                        ScreenClear
+
+                                        # This just makes the menu more concise, no need to go to another member to set perms
+                                        $isAdmin = Get-LocalGroupMember -Group "Administrators" | Where-Object { $_.Name.contains($who) }
+                                    
+                                        if (-not $isAdmin){
+                                            $option3 = "Swap " + $who + " Perms to Admin"
+                                        }
+                                        
+                                        else{
+                                            $option3 = "Swap "+ $who + " Perms to Standard User"
+                                        }
+
+                                        Write-Progress -Activity  "Editing User" -Status "Editing User $who | Permissions: $(if ($isAdmin){"Admin"}else{"Standard"})"
+
+                                        # Gives Options of what do to with the user
+                                        $what = BuildSubOptionFrame(" 1) Rename $who `n 2) Change $who Password `n 3) $option3 `n 4) Delete $who `n 5) Change Current Edit User `n 6) Exit User Configuration")
                                 
-                                $users = $b + $a
-            
-                                # Turns the array into the string that the BuildSubOptionFrame can work with
-                                $userString = FormatArrayToString -Array $users
+                                        try {
+                                            
+                                            # Rename User
+                                            if ($what -eq "1") {
 
-                                # Chooses the user you want to edit
-                                $userInput = BuildSubOptionFrame($userString)
+                                                ScreenClear
+
+                                                # Changes the name of a certain User
+                                                $newName = CenterText -Text "Renaming $who" -PromptString "New Name"
+                                                Rename-LocalUser -Name $who -NewName $newName
+                                                Write-Host "Changed name of $who to $newName" -ForegroundColor Green
+                            
+                                                # Adds to the manual log
+                                                "[" + (Get-CurrentTime) + "] $curuser Renamed User $who to $newName" >> $manLog
+                                                $who = $newName
+                        
+                                            }
+                                        
+                                            # Change Password
+                                            elseif ($what -eq "2") {
+
+                                                ScreenClear
+
+                                                $password = CenterText -Text "Changing Password for $who" -PromptString "New Password" -SecureString $true
+
+                                                $checkedPass = CheckPasswordDefault -TestPass $password
+
+                                                if ($checkedPass -ne $null){
+
+                                                    if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                        # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                        $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
+                                                    }
+
+                                                    Set-LocalUser "$who" -Password $checkedPass 
+
+                                                    # Does NOT show the password, that would be insecure and not safe
+                                                    "[" + (Get-CurrentTime) + "] $curuser Changed Password for User $who" >> $manLog
+
+                                                }
+                                            }
+                                
+                                            # Change Permissions
+                                            elseif ($what -eq "3") {
 
 
-                                # Encase you want to exit, only custom to the users part
-                                if ($userInput -eq ($users.Length + 1)){
+                                                if (-not $isAdmin){
+                                                    
+                                                    Add-LocalGroupMember -Group "Administrators" -Member "$who"
+                                                    Remove-LocalGroupMember -Group "Users" -Member "$who"
 
-                                    # Adds to the manual log
-                                    "[" + (Get-CurrentTime) + "] $curuser Exited User Edit Mode" >> $manLog
-                                    break 
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of User $who to Administrators" >> $manLog
+                
+                                                }
 
+                                                else{
+                                                
+                                                    Remove-LocalGroupMember -Group "Administrators" -Member "$who"
+                                                    Add-LocalGroupMember -Group "Users" -Member "$who"
+
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of User $who to Standard" >> $manLog
+
+                                                }
+                                            }
+                                
+                                            # Delete User
+                                            elseif ($what -eq "4") {
+
+                                                Write-Host "Delete $who"
+                                                ScreenClear
+                                                
+                                                $AREYOUSURE = 2FA -Message "Are you sure you want to delete $($who)?"
+
+                                                if ($AREYOUSURE -eq "Y") {
+
+                                                    Remove-LocalUser -Name "$who"
+
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Obliterated User $who (ROR2 Reference)" >> $manLog
+                                                    Write-Progress -Activity  "Editing User" -Completed
+                                                    break 
+                                        
+                                                }
+
+                                                else{
+
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Decided Not to Obliterate User $who" >> $manLog
+
+                                                }
+                                            }
+                                
+                                            # Change Current Edit User
+                                            elseif ($what -eq "5") {
+                                    
+                                                # Let you change the user you are working on
+                                                Write-Host "Change Edit User"
+
+                                                # Adds to the manual log
+                                                "[" + (Get-CurrentTime) + "] $curuser Changed the user they were editing" >> $manLog
+                                                Write-Progress -Activity  "Editing User" -Completed
+                                                break
+                                
+                                            }
+                                
+                                            # Exits User Config
+                                            elseif ($what -eq "6") {
+
+                                                # Adds to the manual log
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited User Configuration" >> $manLog
+                                                Write-Progress -Activity  "Editing User" -Completed
+                                                break editUsers
+                                    
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                        }
+                                    }
+                                }
+                            }
+
+                            # Edits Groups
+                            elseif ($editInput -eq "2") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Entered Edit Group Configuration" >> $manLog
+
+                                $groupArray = (Get-LocalGroup).name
+                                $groupString = FormatArrayToString -Array $groupArray
+
+                                $groupInput = BuildSubOptionFrame($groupString)
+
+                                if ($groupInput -eq ($groupArray.Length + 1)){
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group Configuration" >> $manLog
+                                    continue 
+                
                                 }
 
-                                $who = ($users[$userInput - 1])
+                                $groupSelected = ($groupArray[$groupInput - 1])
 
-                                # The options of the users
                                 While ($True) {
 
                                     ScreenClear
 
-                                    # This just makes the menu more concise, no need to go to another member to set perms
-                                    $isAdmin = Get-LocalGroupMember -Group "Administrators" | Where-Object { $_.Name.contains($who) }
-                                
-                                    if (-not $isAdmin){
-                                        $option3 = "Swap " + $who + " Perms to Admin"
-                                    }
-                                    
-                                    else{
-                                        $option3 = "Swap "+ $who + " Perms to Standard User"
-                                    }
+                                    # Little hard to read
+                                    Write-Progress -Activity  "Editing Group" -Status "Editing Group $groupSelected | Users: $(if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0) {"None"}else{(Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name).Replace($computerName + '\', '')})"
+                                    $editGroup = BuildSubOptionFrame(" 1) Add Group User `n 2) Remove Groups User `n 3) Delete Group `n 4) Exit")
 
-                                    Write-Progress -Activity  "Editing User" -Status "Editing User $who | Permissions: $(if ($isAdmin){"Admin"}else{"Standard"})"
+                                    try{
 
-                                    # Gives Options of what do to with the user
-                                    $what = BuildSubOptionFrame(" 1) Rename $who `n 2) Change $who Password `n 3) $option3 `n 4) Delete $who `n 5) Change Current Edit User `n 6) Exit User Configuration")
-                            
-                                    try {
-                                        
-                                        # Rename User
-                                        if ($what -eq "1") {
+                                        # Adds a user to a group
+                                        if ($editGroup -eq "1") {
 
-                                            ScreenClear
+                                            "[" + (Get-CurrentTime) + "] $curuser Entered Edit Group '$groupSelected' User Configuration" >> $manLog
 
-                                            # Changes the name of a certain User
-                                            $newName = CenterText -Text "Renaming $who" -PromptString "New Name"
-                                            Rename-LocalUser -Name $who -NewName $newName
-                                            Write-Host "Changed name of $who to $newName" -ForegroundColor Green
-                        
-                                            # Adds to the manual log
-                                            "[" + (Get-CurrentTime) + "] $curuser Renamed User $who to $newName" >> $manLog
-                                            $who = $newName
-                    
-                                        }
-                                    
-                                        # Change Password
-                                        elseif ($what -eq "2") {
+                                            # Makes it so you can add multiple users at once
+                                            While ($true){
 
-                                            ScreenClear
+                                                # If there is nobody in the group
+                                                if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
+                                                    
+                                                    # Get all local users
+                                                    $filteredUsers = Get-LocalUser
 
-                                            $password = CenterText -Text "Changing Password for $who" -PromptString "New Password" -SecureString $true
-                                            Set-LocalUser "$who" -Password $password 
+                                                }
 
-                                            # Does NOT show the password, that would be insecure and not safe
-                                            "[" + (Get-CurrentTime) + "] $curuser Changed Password for User $who" >> $manLog
-                            
-                                        }
-                            
-                                        # Change Permissions
-                                        elseif ($what -eq "3") {
+                                                else{
 
+                                                    # Get all local users
+                                                    $allUsers = Get-LocalUser
 
-                                            if (-not $isAdmin){
+                                                    # Get members of the specified group (e.g., "Administrators")
+                                                    $groupMembers = (Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name).Replace("$computerName\", "")
+
+                                                    # Filter out users who are in the specified group
+                                                    $filteredUsers = $allUsers | Where-Object { $groupMembers -notcontains $_.Name }
+
+                                                }
+
+                                                $filteredUsersArray = FormatArrayToString -Array $filteredUsers
+
+                                                $userToAddNumber = BuildSubOptionFrame($filteredUsersArray)
+
+                                                # Exits the group menu
+                                                if ($userToAddNumber -eq ($filteredUsers.Length + 1)){
+
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group '$groupSelected' User Configuration" >> $manLog
+                                                    break 
+
+                                                }
+
+                                                else{
+
+                                                    $userToAdd = ($filteredUsers[$userToAddNumber - 1])
+
+                                                    Add-LocalGroupMember -Group $groupSelected -Member $userToAdd
+                                                    "[" + (Get-CurrentTime) + "] $curuser Added User '$userToAdd' to group '$groupSelected'" >> $manLog
                                                 
-                                                Add-LocalGroupMember -Group "Administrators" -Member "$who"
-                                                Remove-LocalGroupMember -Group "Users" -Member "$who"
-
-                                                # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of User $who to Administrators" >> $manLog
-            
-                                            }
-
-                                            else{
-                                            
-                                                Remove-LocalGroupMember -Group "Administrators" -Member "$who"
-                                                Add-LocalGroupMember -Group "Users" -Member "$who"
-
-                                                # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of User $who to Standard" >> $manLog
-
+                                                }
                                             }
                                         }
-                            
-                                        # Delete User
-                                        elseif ($what -eq "4") {
 
-                                            Write-Host "Delete $who"
-                                            ScreenClear
+                                        # Removes a user from the group
+                                        if ($editGroup -eq "2") {
+
+                                            "[" + (Get-CurrentTime) + "] $curuser Entered remove user for group '$groupSelected' " >> $manLog
                                             
-                                            $AREYOUSURE = 2FA -Message "Are you sure you want to delete $($who)?"
+                                            # If there is nobody in the group
+                                            if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
+
+                                                BuildSubTerminalText -Text "There is no users in the group $groupSelected"
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited remove user for group '$groupSelected' (No Users in group) " >> $manLog
+                                                continue
+
+                                            }
+
+                                            # Makes it so you can add multiple users at once
+                                            While ($true){
+
+                                                # If there is nobody in the group
+                                                if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
+
+                                                    "[" + (Get-CurrentTime) + "] $curuser Exited remove user for group '$groupSelected' (No Users in group) " >> $manLog
+                                                    break
+
+                                                }
+
+                                                # Get members of the specified group (e.g., "Administrators")
+                                                $groupMembers = @(Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name | ForEach-Object { $_.Replace("$computerName\", "") })
+
+                                                $filteredUsersArray = FormatArrayToString -Array $groupMembers
+
+                                                $userToRemoveNumber = BuildSubOptionFrame($filteredUsersArray)
+
+                                                # Exits the group menu
+                                                if ($userToRemoveNumber -eq ($groupMembers.Length + 1)){
+
+                                                    # Adds to the manual log
+                                                    "[" + (Get-CurrentTime) + "] $curuser Exited remove user for Group '$groupSelected'" >> $manLog
+                                                    break 
+
+                                                }
+
+                                                # Removes users chosen
+                                                else{
+
+                                                    $userToRemove = ($groupMembers[$userToRemoveNumber - 1])
+                                                    Remove-LocalGroupMember -Group $groupSelected -Member $userToRemove
+                                                    "[" + (Get-CurrentTime) + "] $curuser Removed User '$userToRemove' from group '$groupSelected'" >> $manLog
+
+                                                }
+                                            }
+                                        }
+
+                                        # Deletes the group
+                                        if ($editGroup -eq "3"){
+
+                                            $AREYOUSURE = 2FA -Message "Are you sure you want to delete $($groupSelected)?"
 
                                             if ($AREYOUSURE -eq "Y") {
 
-                                                Remove-LocalUser -Name "$who"
+                                                Remove-LocalGroup -Name "$groupSelected"
 
                                                 # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Obliterated User $who (ROR2 Reference)" >> $manLog
-                                                Write-Progress -Activity  "Editing User" -Completed
+                                                "[" + (Get-CurrentTime) + "] $curuser Deleted Group '$groupSelected'" >> $manLog
+                                                Write-Progress -Activity  "Editing Group" -Completed
                                                 break 
-                                    
+
                                             }
 
                                             else{
 
                                                 # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Decided Not to Obliterate User $who" >> $manLog
+                                                "[" + (Get-CurrentTime) + "] $curuser Decided Not to Delete Group '$groupSelected'" >> $manLog
 
                                             }
                                         }
-                            
-                                        # Change Current Edit User
-                                        elseif ($what -eq "5") {
-                                
-                                            # Let you change the user you are working on
-                                            Write-Host "Change Edit User"
 
-                                            # Adds to the manual log
-                                            "[" + (Get-CurrentTime) + "] $curuser Changed the user they were editing" >> $manLog
-                                            Write-Progress -Activity  "Editing User" -Completed
+                                        # Exits Groups Editing
+                                        if ($editGroup -eq "4") {
+
+                                            "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group Configuration" >> $manLog
+                                            Write-Progress -Activity  "Editing Group" -Completed
                                             break
                             
                                         }
-                            
-                                        # Exits User Config
-                                        elseif ($what -eq "6") {
+                                    }
 
+                                    catch {
+                                        WriteErrorLog -ErrorRecord $_
+                                    }
+                                }
+                            } 
+                            
+                            # Adds a new user as standard users
+                            elseif ($editInput -eq "3") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Entered Add User Configuration" >> $manLog
+
+                                # Adds a new User
+                                $NewUserName = CenterText -Text "Adding New User" -PromptString "New User Name"
+
+                                if ($NewUserName -eq "") {
+                                    "[" + (Get-CurrentTime) + "] $curuser Did not provide name for New User, Exiting Add User Configuration" >> $manLog
+                                }
+
+                                else {
+
+                                    try{
+
+                                        $NewUserPassword = CenterText -Text "Password for $NewUserName" -PromptString "Password" -SecureString $true
+
+                                        $checkedPass = CheckPasswordDefault -TestPass $NewUserPassword
+
+                                        if ($checkedPass -ne $null){
+
+                                            if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                #  AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1
+                                            }
+
+                                            New-LocalUser "$NewUserName" -Password $checkedPass -FullName $NewUserName | Out-Null
+                                            Add-LocalGroupMember -Group "Users" -Member "$NewUserName" | Out-Null
+                            
                                             # Adds to the manual log
-                                            "[" + (Get-CurrentTime) + "] $curuser Exited User Configuration" >> $manLog
-                                            Write-Progress -Activity  "Editing User" -Completed
-                                            break editUsers
-                                
-                                        } 
+                                            "[" + (Get-CurrentTime) + "] $curuser Added new User $NewUserName to Local Group Users" >> $manLog
+                                        
+                                        }
                                     }
 
                                     catch {
@@ -524,243 +757,324 @@ else{
                                     }
                                 }
                             }
+
+                            # Adds a new group
+                            elseif ($editInput -eq "4") {
+
+                                try{
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Adding Group Configuration" >> $manLog
+                                    $groupName = CenterText -Text "Adding New Group" -PromptString "New Group Name"
+                                    $groupDescription = CenterText -Text "$groupName Description" -PromptString "Group Description"
+                                    New-LocalGroup -Name $groupName -Description $groupDescription | Out-Null
+                                    
+                                    # Adds to the manual log
+                                    "[" + (Get-CurrentTime) + "] $curuser Added New group '$groupName' with description '$groupDescription'" >> $manLog
+                                
+                                }
+
+                                catch{
+                                    WriteErrorLog -ErrorRecord $_
+                                }
+                            } 
+
+                            # Exits users Configuration
+                            elseif ($editInput -eq "5") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Exited User Configuration" >> $manLog
+                                break
+                    
+                            }
                         }
+                    }
 
-                        # Edits Groups
-                        elseif ($editInput -eq "2") {
+                    # Remote Editing local users | AI
+                    elseif (IsDC){
 
-                            "[" + (Get-CurrentTime) + "] $curuser Entered Edit Group Configuration" >> $manLog
+                        # BTW this code here is terrible, but it works
 
-                            $groupArray = (Get-LocalGroup).name
-                            $groupString = FormatArrayToString -Array $groupArray
+                        "[" + (Get-CurrentTime) + "] $curuser Entered Remote Local User Configuration" >> $manLog
 
-                            $groupInput = BuildSubOptionFrame($groupString)
+                        :remoteUserEdit while ($true){
 
-                            if ($groupInput -eq ($groupArray.Length + 1)){
-
-                                "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group Configuration" >> $manLog
-                                continue 
-            
+                            # Select target computer first
+                            try {
+                                $domainComputers = Get-ADComputer -Filter * | Where-Object { $_.Name -ne $env:COMPUTERNAME } | Select-Object -ExpandProperty Name
+                            } catch {
+                                BuildSubTerminalText -Text "Failed to query domain computers"
+                                WriteErrorLog -ErrorRecord $_
+                                continue
                             }
 
-                            $groupSelected = ($groupArray[$groupInput - 1])
+                            if (-not $domainComputers -or $domainComputers.Count -eq 0) {
+                                BuildSubTerminalText -Text "No domain computers found"
+                                continue
+                            }
 
+                            $computerString = FormatArrayToString -Array $domainComputers
+                            $computerChoice = BuildSubOptionFrame($computerString)
+
+                            # Exit if user chose to cancel
+                            if ($computerChoice -eq ($domainComputers.Length + 1)) {
+                                "[" + (Get-CurrentTime) + "] $curuser is done editing users" >> $manLog
+                                break remoteUserEdit
+                            }
+
+                            $selectedComputer = $domainComputers[$computerChoice - 1]
+                            
+                            # Test connectivity first
+                            if (-not (Test-Connection -ComputerName $selectedComputer -Count 1 -Quiet)) {
+                                BuildSubTerminalText -Text "Cannot reach computer: $selectedComputer"
+                                continue
+                            }
+
+                            "[" + (Get-CurrentTime) + "] $curuser Selected target computer: $selectedComputer" >> $manLog
+
+                            # Remote local user management menu
                             While ($True) {
 
                                 ScreenClear
-
-                                # Little hard to read
-                                Write-Progress -Activity  "Editing Group" -Status "Editing Group $groupSelected | Users: $(if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0) {"None"}else{(Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name).Replace($computerName + '\', '')})"
-                                $editGroup = BuildSubOptionFrame(" 1) Add Group User `n 2) Remove Groups User `n 3) Delete Group `n 4) Exit")
-
-                                try{
-
-                                    # Adds a user to a group
-                                    if ($editGroup -eq "1") {
-
-                                        "[" + (Get-CurrentTime) + "] $curuser Entered Edit Group '$groupSelected' User Configuration" >> $manLog
-
-                                        # Makes it so you can add multiple users at once
-                                        While ($true){
-
-                                            # If there is nobody in the group
-                                            if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
-                                                
-                                                # Get all local users
-                                                $filteredUsers = Get-LocalUser
-
-                                            }
-
-                                            else{
-
-                                                # Get all local users
-                                                $allUsers = Get-LocalUser
-
-                                                # Get members of the specified group (e.g., "Administrators")
-                                                $groupMembers = (Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name).Replace("$computerName\", "")
-
-                                                # Filter out users who are in the specified group
-                                                $filteredUsers = $allUsers | Where-Object { $groupMembers -notcontains $_.Name }
-
-                                            }
-
-                                            $filteredUsersArray = FormatArrayToString -Array $filteredUsers
-
-                                            $userToAddNumber = BuildSubOptionFrame($filteredUsersArray)
-
-                                            # Exits the group menu
-                                            if ($userToAddNumber -eq ($filteredUsers.Length + 1)){
-
-                                                # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group '$groupSelected' User Configuration" >> $manLog
-                                                break 
-
-                                            }
-
-                                            else{
-
-                                                $userToAdd = ($filteredUsers[$userToAddNumber - 1])
-
-                                                Add-LocalGroupMember -Group $groupSelected -Member $userToAdd
-                                                "[" + (Get-CurrentTime) + "] $curuser Added User '$userToAdd' to group '$groupSelected'" >> $manLog
-                                            
-                                            }
-                                        }
-                                    }
-
-                                    # Removes a user from the group
-                                    if ($editGroup -eq "2") {
-
-                                        "[" + (Get-CurrentTime) + "] $curuser Entered remove user for group '$groupSelected' " >> $manLog
-                                        
-                                        # If there is nobody in the group
-                                        if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
-
-                                            BuildSubTerminalText -Text "There is no users in the group $groupSelected"
-                                            "[" + (Get-CurrentTime) + "] $curuser Exited remove user for group '$groupSelected' (No Users in group) " >> $manLog
-                                            continue
-
-                                        }
-
-                                        # Makes it so you can add multiple users at once
-                                        While ($true){
-
-                                            # If there is nobody in the group
-                                            if ((Get-LocalGroupMember -Group "$groupSelected" | Where-Object { $_.Name.contains($computerName) } | Measure-Object).Count -eq 0){
-
-                                                "[" + (Get-CurrentTime) + "] $curuser Exited remove user for group '$groupSelected' (No Users in group) " >> $manLog
-                                                break
-
-                                            }
-
-                                            # Get members of the specified group (e.g., "Administrators")
-                                            $groupMembers = @(Get-LocalGroupMember -Group "$groupSelected" | Select-Object -ExpandProperty Name | ForEach-Object { $_.Replace("$computerName\", "") })
-
-                                            $filteredUsersArray = FormatArrayToString -Array $groupMembers
-
-                                            $userToRemoveNumber = BuildSubOptionFrame($filteredUsersArray)
-
-                                            # Exits the group menu
-                                            if ($userToRemoveNumber -eq ($groupMembers.Length + 1)){
-
-                                                # Adds to the manual log
-                                                "[" + (Get-CurrentTime) + "] $curuser Exited remove user for Group '$groupSelected'" >> $manLog
-                                                break 
-
-                                            }
-
-                                            # Removes users chosen
-                                            else{
-
-                                                $userToRemove = ($groupMembers[$userToRemoveNumber - 1])
-                                                Remove-LocalGroupMember -Group $groupSelected -Member $userToRemove
-                                                "[" + (Get-CurrentTime) + "] $curuser Removed User '$userToRemove' from group '$groupSelected'" >> $manLog
-
-                                            }
-                                        }
-                                    }
-
-                                    # Deletes the group
-                                    if ($editGroup -eq "3"){
-
-                                        $AREYOUSURE = 2FA -Message "Are you sure you want to delete $($groupSelected)?"
-
-                                        if ($AREYOUSURE -eq "Y") {
-
-                                            Remove-LocalGroup -Name "$groupSelected"
-
-                                            # Adds to the manual log
-                                            "[" + (Get-CurrentTime) + "] $curuser Deleted Group '$groupSelected'" >> $manLog
-                                            Write-Progress -Activity  "Editing Group" -Completed
-                                            break 
-
-                                        }
-
-                                        else{
-
-                                            # Adds to the manual log
-                                            "[" + (Get-CurrentTime) + "] $curuser Decided Not to Delete Group '$groupSelected'" >> $manLog
-
-                                        }
-                                    }
-
-                                    # Exits Groups Editing
-                                    if ($editGroup -eq "4") {
-
-                                        "[" + (Get-CurrentTime) + "] $curuser Exited Edit Group Configuration" >> $manLog
-                                        Write-Progress -Activity  "Editing Group" -Completed
-                                        break
-                        
-                                    }
-                                }
-
-                                catch {
-                                    WriteErrorLog -ErrorRecord $_
-                                }
-                            }
-                        } 
-                        
-                        # Adds a new user as standard users
-                        elseif ($editInput -eq "3") {
-
-                            "[" + (Get-CurrentTime) + "] $curuser Entered Add User Configuration" >> $manLog
-
-                            # Adds a new User
-                            $NewUserName = CenterText -Text "Adding New User" -PromptString "New User Name"
-
-                            if ($NewUserName -eq "") {
-                                "[" + (Get-CurrentTime) + "] $curuser Did not provide name for New User, Exiting Add User Configuration" >> $manLog
-                            }
-
-                            else {
-
-                                try{
-
-                                    $NewUserPassword = CenterText -Text "Password for $NewUserName" -PromptString "Password" -SecureString $true
-                                    New-LocalUser "$NewUserName" -Password $NewUserPassword -FullName $NewUserName | Out-Null
-                                    Add-LocalGroupMember -Group "Users" -Member "$NewUserName" | Out-Null
-                    
-                                    # Adds to the manual log
-                                    "[" + (Get-CurrentTime) + "] $curuser Added new User $NewUserName to Local Group Users" >> $manLog
+                                Write-Progress -Activity "Remote Local User Management" -Status "Target: $selectedComputer"
                                 
-                                }
-
-                                catch {
-                                    WriteErrorLog -ErrorRecord $_
-                                }
-                            }
-                        }
-
-                        # Adds a new group
-                        elseif ($editInput -eq "4") {
-
-                            try{
-
-                                "[" + (Get-CurrentTime) + "] $curuser Entered Adding Group Configuration" >> $manLog
-                                $groupName = CenterText -Text "Adding New Group" -PromptString "New Group Name"
-                                $groupDescription = CenterText -Text "$groupName Description" -PromptString "Group Description"
-                                New-LocalGroup -Name $groupName -Description $groupDescription | Out-Null
-                                
-                                # Adds to the manual log
-                                "[" + (Get-CurrentTime) + "] $curuser Added New group '$groupName' with description '$groupDescription'" >> $manLog
+                                $editInput = BuildSubOptionFrame(" 1) Edit Users `n 2) Add Users `n 3) Change Target Computer `n 4) Exit")
                             
+                                # Edit Remote Users
+                                if ($editInput -eq "1") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Remote User Edit Mode on $selectedComputer" >> $manLog
+
+                                    :editUsers While ($True) {
+
+                                        ScreenClear
+
+                                        try {
+                                            # Get remote local users via Invoke-Command
+                                            $remoteUsers = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                $adminUsers = (Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue).Name | ForEach-Object { $_.Split('\')[-1] } | Where-Object { $_ -notmatch "^(NT AUTHORITY|BUILTIN)" }
+                                                $standardUsers = (Get-LocalGroupMember -Group "Users" -ErrorAction SilentlyContinue).Name | ForEach-Object { $_.Split('\')[-1] } | Where-Object { $_ -notmatch "^(NT AUTHORITY|BUILTIN)" }
+                                                return ($adminUsers + $standardUsers) | Sort-Object | Get-Unique
+                                            } -ErrorAction Stop
+
+                                            if (-not $remoteUsers) {
+                                                BuildSubTerminalText -Text "No local users found on $selectedComputer"
+                                                break editUsers
+                                            }
+
+                                        } catch {
+                                            BuildSubTerminalText -Text "Failed to connect to $selectedComputer or retrieve users"
+                                            WriteErrorLog -ErrorRecord $_
+                                            break editUsers
+                                        }
+
+                                        # Turn the array into string for menu
+                                        $userString = FormatArrayToString -Array $remoteUsers
+
+                                        # Choose the user to edit
+                                        $userInput = BuildSubOptionFrame($userString)
+
+                                        # Exit option
+                                        if ($userInput -eq ($remoteUsers.Length + 1)){
+                                            "[" + (Get-CurrentTime) + "] $curuser Exited Remote User Edit Mode" >> $manLog
+                                            break 
+                                        }
+
+                                        $who = $remoteUsers[$userInput - 1]
+
+                                        # The options for the remote user
+                                        While ($True) {
+
+                                            ScreenClear
+
+                                            try {
+                                                # Check if user is admin on remote machine
+                                                $isAdmin = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    param($username)
+                                                    $adminMembers = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+                                                    return ($adminMembers.Name | ForEach-Object { $_.Split('\')[-1] }) -contains $username
+                                                } -ArgumentList $who -ErrorAction Stop
+
+                                            } catch {
+                                                $isAdmin = $false
+                                            }
+                                        
+                                            if (-not $isAdmin){
+                                                $option3 = "Swap $who Perms to Admin"
+                                            } else {
+                                                $option3 = "Swap $who Perms to Standard User"
+                                            }
+
+                                            Write-Progress -Activity "Editing Remote User" -Status "Target: $selectedComputer | User: $who | Permissions: $(if ($isAdmin){"Admin"}else{"Standard"})"
+
+                                            # Give options for remote user management
+                                            $what = BuildSubOptionFrame(" 1) Rename $who `n 2) Change $who Password `n 3) $option3 `n 4) Delete $who `n 5) Change Current Edit User `n 6) Exit User Configuration")
+                                    
+                                            try {
+                                                
+                                                # Rename User
+                                                if ($what -eq "1") {
+
+                                                    ScreenClear
+                                                    $newName = CenterText -Text "Renaming $who on $selectedComputer" -PromptString "New Name"
+                                                    
+                                                    Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                        param($oldName, $newName)
+                                                        Rename-LocalUser -Name $oldName -NewName $newName
+                                                    } -ArgumentList $who, $newName -ErrorAction Stop
+
+                                                    Write-Host "Changed name of $who to $newName on $selectedComputer" -ForegroundColor Green
+                                
+                                                    "[" + (Get-CurrentTime) + "] $curuser Renamed Remote User $who to $newName on $selectedComputer" >> $manLog
+                                                    $who = $newName
+                            
+                                                }
+                                            
+                                                # Change Password
+                                                elseif ($what -eq "2") {
+
+                                                    ScreenClear
+                                                    $password = CenterText -Text "Changing Password for $who on $selectedComputer" -PromptString "New Password" -SecureString $true
+                                                    
+                                                    $checkedPass = CheckPasswordDefault -TestPass $password
+
+                                                    if ($checkedPass -ne $null){
+                                                        
+                                                        if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                            # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                            $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                              # Has to be third element idk why 
+                                                        }
+
+                                                        Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                            param($username, $newPassword)
+                                                            Set-LocalUser $username -Password $newPassword
+                                                        } -ArgumentList $who, $checkedPass -ErrorAction Stop
+
+                                                        "[" + (Get-CurrentTime) + "] $curuser Changed Password for Remote User $who on $selectedComputer" >> $manLog
+                                                    }
+                                                }
+                                    
+                                                # Change Permissions
+                                                elseif ($what -eq "3") {
+
+                                                    Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                        param($username, $isCurrentlyAdmin)
+                                                        if (-not $isCurrentlyAdmin){
+                                                            Add-LocalGroupMember -Group "Administrators" -Member $username
+                                                            Remove-LocalGroupMember -Group "Users" -Member $username -ErrorAction SilentlyContinue
+                                                        } else {
+                                                            Remove-LocalGroupMember -Group "Administrators" -Member $username
+                                                            Add-LocalGroupMember -Group "Users" -Member $username -ErrorAction SilentlyContinue
+                                                        }
+                                                    } -ArgumentList $who, $isAdmin -ErrorAction Stop
+
+                                                    if (-not $isAdmin){
+                                                        "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of Remote User $who to Administrators on $selectedComputer" >> $manLog
+                                                    } else {
+                                                        "[" + (Get-CurrentTime) + "] $curuser Changed Permissions of Remote User $who to Standard on $selectedComputer" >> $manLog
+                                                    }
+                                                }
+                                        
+                                                # Delete User
+                                                elseif ($what -eq "4") {
+
+                                                    ScreenClear
+                                                    $AREYOUSURE = 2FA -Message "Are you sure you want to delete $($who) on $selectedComputer?"
+
+                                                    if ($AREYOUSURE -eq "Y") {
+
+                                                        Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                            param($username)
+                                                            Remove-LocalUser -Name $username
+                                                        } -ArgumentList $who -ErrorAction Stop
+
+                                                        "[" + (Get-CurrentTime) + "] $curuser Obliterated Remote User $who on $selectedComputer" >> $manLog
+                                                        Write-Progress -Activity "Editing Remote User" -Completed
+                                                        break 
+                                            
+                                                    } else {
+                                                        "[" + (Get-CurrentTime) + "] $curuser Decided Not to Obliterate Remote User $who on $selectedComputer" >> $manLog
+                                                    }
+                                                }
+                                        
+                                                # Change Current Edit User
+                                                elseif ($what -eq "5") {
+                                        
+                                                    "[" + (Get-CurrentTime) + "] $curuser Changed the remote user they were editing on $selectedComputer" >> $manLog
+                                                    Write-Progress -Activity "Editing Remote User" -Completed
+                                                    break
+                                                }
+                                        
+                                                # Exit User Config
+                                                elseif ($what -eq "6") {
+
+                                                    "[" + (Get-CurrentTime) + "] $curuser Exited Remote User Configuration" >> $manLog
+                                                    Write-Progress -Activity "Editing Remote User" -Completed
+                                                    break editUsers
+                                        
+                                                } 
+                                            }
+
+                                            catch {
+                                                WriteErrorLog -ErrorRecord $_
+                                                BuildSubTerminalText -Text "Failed to perform action on remote computer"
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                # Add new remote user
+                                elseif ($editInput -eq "2") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Add Remote User Configuration on $selectedComputer" >> $manLog
+
+                                    $NewUserName = CenterText -Text "Adding New User to $selectedComputer" -PromptString "New User Name"
+
+                                    if ($NewUserName -eq "") {
+                                        "[" + (Get-CurrentTime) + "] $curuser Did not provide name for New Remote User" >> $manLog
+                                    } else {
+
+                                        try{
+                                            $NewUserPassword = CenterText -Text "Password for $NewUserName on $selectedComputer" -PromptString "Password" -SecureString $true
+                                            
+                                            Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                param($username, $password, $fullname)
+                                                New-LocalUser $username -Password $password -FullName $fullname | Out-Null
+                                                Add-LocalGroupMember -Group "Users" -Member $username | Out-Null
+                                            } -ArgumentList $NewUserName, $NewUserPassword, $NewUserName -ErrorAction Stop
+
+                                            "[" + (Get-CurrentTime) + "] $curuser Added new Remote User $NewUserName to Local Group Users on $selectedComputer" >> $manLog
+                                            Write-Host "Created user $NewUserName on $selectedComputer" -ForegroundColor Green
+                        
+                                        } catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to create user on remote computer"
+                                        }
+                                    }
+                                }
+
+                                # Change target computer
+                                elseif ($editInput -eq "3") {
+                                    "[" + (Get-CurrentTime) + "] $curuser Changing target computer from $selectedComputer" >> $manLog
+                                    break
+                                }
+
+                                # Exit remote user configuration
+                                elseif ($editInput -eq "4") {
+                                    "[" + (Get-CurrentTime) + "] $curuser Exited Remote Local User Configuration" >> $manLog
+                                    Write-Progress -Activity "Remote Local User Management" -Status "Target: $selectedComputer" -Completed
+                                    break remoteUserEdit
+                                }
                             }
-
-                            catch{
-                                WriteErrorLog -ErrorRecord $_
-                            }
-                        } 
-
-                        # Exits users Configuration
-                        elseif ($editInput -eq "5") {
-
-                            "[" + (Get-CurrentTime) + "] $curuser Exited User Configuration" >> $manLog
-                            break
-                
                         }
                     }
-                }
+                    
+                    else{
+                         
+                        BuildSubTerminalText -Text "Not part of a domain or Not a domain controller"
+                        "[" + (Get-CurrentTime) + "] $computerName is not part of a domain or on a domain controller" >> $manLog
 
+                    }
+                }
+                
                 # Active Directory User Configuration | AI
                 if ($choice -eq "2") {
 
@@ -841,34 +1155,19 @@ else{
                                                     ScreenClear
                                                     $newPassword = CenterText -Text "Resetting Password for $who" -PromptString "New Password" -SecureString $true
 
-                                                    # Don't know if this is safe, but oh well
-                                                    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($newPassword)
-                                                    $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-                                                    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+                                                    $checkedPass = CheckPasswordDefault -TestPass $newPassword
 
-                                                    # If its nothing
-                                                    if ($newPassword -eq "" -or $plainPassword -eq ""){
-                                                        
-                                                        $newPassword = $global:scriptDefaultPassword
-                                                        BuildSubTerminalText -Text "Setting password to script default"
-                                                        "[" + (Get-CurrentTime) + "] Setting password for $who to script default" >> $manLog
-                                                        $plainPassword = $null
-                                                        break
+                                                    if ($checkedPass -ne $null){
 
-                                                    }
+                                                        if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                            # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                            $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
+                                                        }
 
-                                                    # If it does not pass the password tests
-                                                    elseif (-not (PassesPasswordPolicy -TestPass $plainPassword)){
-                                                        BuildSubTerminalText -Text "Password does not meet password policy requirements"
-                                                        $plainPassword = $null
-                                                    }
-
-                                                    else{
-
-                                                        Set-ADAccountPassword -Identity $who -NewPassword $newPassword -Reset
+                                                        Set-ADAccountPassword -Identity $who -NewPassword $checkedPass -Reset
                                                         Set-ADUser -Identity $who -ChangePasswordAtLogon $true
                                                         Write-Host "Password reset for $who" -ForegroundColor Green
-
+                                                    
                                                         # Adds to the manual log
                                                         "[" + (Get-CurrentTime) + "] $curuser Reset Password for AD User $who" >> $manLog
                                                         $plainPassword = $null
