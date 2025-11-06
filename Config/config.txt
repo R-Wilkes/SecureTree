@@ -23,6 +23,7 @@ remote_users = Ask
 ## AutoFix
 set_local_users = Ask
 set_domain_users = Ask
+set_remote_users = Ask
 enable_firewall = Ask
 run_service_config = Ask
 set_registry_keys = Ask

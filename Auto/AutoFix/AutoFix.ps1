@@ -255,7 +255,7 @@ if ((IsDC)){
         foreach ($user in $doNotTouchUsers){
             $usersToNotRemove += $user.trim();
         }
-        
+
         # Function to check if user should be protected
         function DomainUserCheck {
             param (
@@ -468,6 +468,283 @@ if ((IsDC)){
 
         "`n<--------------------------------------------->`nEnd Domain User Changes" >> $logPath
 
+    }
+}
+
+# Will fix Local users on remote machines connected to the domain | AI
+if (IsDC){
+
+    if ((Config("set_remote_users"))){
+        
+        Write-Host "Fixing local users on remote domain machines..." -ForegroundColor Red
+        Write-Host "To avoid any errors, please don't stop mid-way, serious about this" -ForegroundColor Red
+        Start-Sleep $shortSleep
+        Write-Host "You have $longSleep seconds to abort!" -ForegroundColor Red
+        Start-Sleep $longSleep
+
+        "`nRemote Machine Local Users Fixing `n<--------------------------------------------->" >> $logPath
+
+        # Get all domain computers (excluding DCs and current machine)
+        try {
+            $domainComputers = Get-ADComputer -Filter * | Where-Object { 
+                $_.Name -ne $env:COMPUTERNAME -and 
+                $_.DistinguishedName -notlike "*Domain Controllers*" 
+            } | Select-Object -ExpandProperty Name
+        } catch {
+            Write-Host "Failed to get domain computers" -ForegroundColor Red
+            "`nFailed to get domain computers: $($_.Exception.Message)" >> $logPath
+            return
+        }
+
+        # Define paths for remote machine user lists
+        $remoteUserListPath = "$current_path/UserLists/Local_Users.txt"
+        $remoteAdminListPath = "$current_path/UserLists/Local_Admins.txt"
+        $doNotTouchUsersPath = "$current_path/UserLists/No_Touch_Users.txt"
+
+        # Read remote user and admin lists
+        $remoteUsers = @()
+        $remoteAdmins = @()
+        
+        if (Test-Path $remoteUserListPath) {
+            $remoteUsers = Get-Content -Path $remoteUserListPath -ErrorAction SilentlyContinue
+        }
+        
+        if (Test-Path $remoteAdminListPath) {
+            $remoteAdmins = Get-Content -Path $remoteAdminListPath -ErrorAction SilentlyContinue
+        }
+
+        # Ignore these users (same as local version)
+        $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "$env:USERDOMAIN\Domain Admins"
+
+        $doNotTouchUsers = Get-Content $doNotTouchUsersPath -ErrorAction SilentlyContinue
+        foreach ($user in $doNotTouchUsers){
+            $usersToNotRemove += $user.trim()
+        }
+
+        # Process each remote computer
+        foreach ($computer in $domainComputers) {
+            
+            Write-Host "Fixing users on computer: $computer" -ForegroundColor Yellow
+            "`nFixing users on Remote Computer: $computer" >> $logPath
+
+            # Test connectivity first
+            if (-not (Test-Connection -ComputerName $computer -Count 1 -Quiet)) {
+                Write-Host "  $computer is not reachable" -ForegroundColor Red
+                "`n  $computer is not reachable" >> $logPath
+                continue
+            }
+
+            try {
+                # Get current state to determine what needs to be done
+                $remoteAnalysis = Invoke-Command -ComputerName $computer -ScriptBlock {
+                    param($remoteUsers, $remoteAdmins, $usersToNotRemove)
+                    
+                    $computerName = $env:COMPUTERNAME
+                    $changes = @()
+
+                    # Function to check if user should be protected
+                    function LocalUserCheck {
+                        param ([string]$inputString)
+                        $inputString = $inputString.replace("$computerName\","").replace("$($computerName.ToUpper())\", "")
+                        return ($usersToNotRemove -contains $inputString)
+                    }
+
+                    # Check for users that need to be created
+                    foreach ($user in $remoteUsers) {
+                        $existingUser = Get-LocalUser -Name $user -ErrorAction SilentlyContinue
+                        if (-not $existingUser) {
+                            $good = LocalUserCheck $user
+                            if ($good -eq $false) {
+                                $changes += "CREATE_USER:$user"
+                            }
+                        } else {
+                            $changes += "PASSWORD_USER:$user"
+                        }
+                    }
+
+                    # Check for admins that need to be created
+                    foreach ($admin in $remoteAdmins) {
+                        $existingAdmin = Get-LocalUser -Name $admin -ErrorAction SilentlyContinue
+                        if (-not $existingAdmin) {
+                            $good = LocalUserCheck $admin
+                            if ($good -eq $false) {
+                                $changes += "CREATE_ADMIN:$admin"
+                            }
+                        } else {
+                            $changes += "PASSWORD_ADMIN:$admin"
+                            
+                            # Check if needs admin privileges
+                            $currentAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+                            $cleanAdminName = $admin.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                            $isAlreadyAdmin = $currentAdmins | Where-Object { 
+                                $_.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -eq $cleanAdminName 
+                            }
+                            if (-not $isAlreadyAdmin) {
+                                $changes += "ADD_ADMIN:$admin"
+                            }
+                        }
+                    }
+
+                    # Check for users that need to be removed
+                    $allLocalUsers = Get-LocalUser | Where-Object { $_.Name -notin $remoteUsers }
+                    foreach ($user in $allLocalUsers) {
+                        if ($user.Name -notin $remoteAdmins) {
+                            $good = LocalUserCheck $user.Name
+                            if ($good -eq $false) {
+                                if ($user.Name -notlike "*$*"){
+                                    $changes += "REMOVE_USER:$($user.Name)"
+                                }
+                            }
+                        }
+                    }
+
+                    # Check for admin privileges that need to be removed
+                    try {
+                        $allAdmins = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop | Where-Object { 
+                            $_.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "") -notin $remoteAdmins 
+                        }
+                        foreach ($admin in $allAdmins) {
+                            $good = LocalUserCheck $admin.Name
+                            if ($good -eq $false) {
+                                $cleanName = $admin.Name.replace("$computerName\","").Replace("$($computerName.ToUpper())\", "")
+                                $changes += "REMOVE_ADMIN:$cleanName"
+                            }
+                        }
+                    } catch {}
+
+                    return $changes
+                } -ArgumentList $remoteUsers, $remoteAdmins, $usersToNotRemove -ErrorAction Stop
+
+                # Process each change needed
+                foreach ($change in $remoteAnalysis) {
+                    $action, $username = $change -split ":", 2
+
+                    switch ($action) {
+                        "CREATE_USER" {
+                            try {
+                                Invoke-Command -ComputerName $computer -ScriptBlock {
+                                    param($user, $defaultPass)
+                                    New-LocalUser "$user" -Password $defaultPass -FullName "$user" | Out-Null
+                                    Add-LocalGroupMember -Group "Users" -Member "$user" | Out-Null
+                                } -ArgumentList $username, $scriptDefaultPassword -ErrorAction Stop
+                                
+                                Write-Host "  Created Local User: '$username'" -ForegroundColor Yellow
+                                "`n  Created Local User: $username on $computer" >> $logPath
+                            } catch {
+                                Write-Host "  Failed to create user: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                "`n  Failed to create user: $username on $computer - $($_.Exception.Message)" >> $logPath
+                            }
+                        }
+
+                        "CREATE_ADMIN" {
+                            try {
+                                Invoke-Command -ComputerName $computer -ScriptBlock {
+                                    param($admin, $defaultPass)
+                                    New-LocalUser "$admin" -Password $defaultPass -FullName "$admin" | Out-Null
+                                    Add-LocalGroupMember -Group "Administrators" -Member "$admin" | Out-Null
+                                } -ArgumentList $username, $scriptDefaultPassword -ErrorAction Stop
+                                
+                                Write-Host "  Created Local Admin: '$username'" -ForegroundColor Yellow
+                                "`n  Created Local Admin: $username on $computer" >> $logPath
+                            } catch {
+                                Write-Host "  Failed to create admin: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                "`n  Failed to create admin: $username on $computer - $($_.Exception.Message)" >> $logPath
+                            }
+                        }
+
+                        "REMOVE_USER" {
+                            try {
+                                Invoke-Command -ComputerName $computer -ScriptBlock {
+                                    param($user)
+                                    Remove-LocalUser -Name $user
+                                } -ArgumentList $username -ErrorAction Stop
+                                
+                                Write-Host "  Removed Local User: '$username'" -ForegroundColor Red
+                                "`n  Removed Local User: $username on $computer" >> $logPath
+                            } catch {
+                                Write-Host "  Failed to remove user: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                "`n  Failed to remove user: $username on $computer - $($_.Exception.Message)" >> $logPath
+                            }
+                        }
+
+                        "REMOVE_ADMIN" {
+                            try {
+                                Invoke-Command -ComputerName $computer -ScriptBlock {
+                                    param($admin)
+                                    Remove-LocalGroupMember -Group "Administrators" -Member $admin -Confirm:$false
+                                } -ArgumentList $username -ErrorAction Stop
+                                
+                                Write-Host "  Removed admin perms: '$username'" -ForegroundColor Red
+                                "`n  Removed admin perms: $username on $computer" >> $logPath
+                            } catch {
+                                Write-Host "  Failed to remove admin perms: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                "`n  Failed to remove admin perms: $username on $computer - $($_.Exception.Message)" >> $logPath
+                            }
+                        }
+
+                        "ADD_ADMIN" {
+                            try {
+                                Invoke-Command -ComputerName $computer -ScriptBlock {
+                                    param($admin)
+                                    Add-LocalGroupMember -Group "Administrators" -Member $admin -ErrorAction Stop
+                                } -ArgumentList $username -ErrorAction Stop
+                                
+                                Write-Host "  Added admin perms: '$username'" -ForegroundColor Yellow
+                                "`n  Added admin perms: $username on $computer" >> $logPath
+                            } catch {
+                                if ($_.Exception.Message -notlike "*already a member*") {
+                                    Write-Host "  Failed to add admin perms: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                    "`n  Failed to add admin perms: $username on $computer - $($_.Exception.Message)" >> $logPath
+                                }
+                            }
+                        }
+
+                        "PASSWORD_USER" {
+                            if ($username -notin $usersToNotRemove) {
+                                try {
+                                    Invoke-Command -ComputerName $computer -ScriptBlock {
+                                        param($user, $defaultPass)
+                                        Set-LocalUser -Name $user -Password $defaultPass
+                                    } -ArgumentList $username, $scriptDefaultPassword -ErrorAction Stop
+                                    
+                                    Write-Host "  Changed password for user: '$username'" -ForegroundColor Magenta
+                                    "`n  Changed password for user: $username on $computer" >> $logPath
+                                } catch {
+                                    Write-Host "  Failed to change password for user: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                    "`n  Failed to change password for user: $username on $computer - $($_.Exception.Message)" >> $logPath
+                                }
+                            }
+                        }
+
+                        "PASSWORD_ADMIN" {
+                            if ($username -notin $usersToNotRemove) {
+                                try {
+                                    Invoke-Command -ComputerName $computer -ScriptBlock {
+                                        param($admin, $defaultPass)
+                                        Set-LocalUser -Name $admin -Password $defaultPass
+                                    } -ArgumentList $username, $scriptDefaultPassword -ErrorAction Stop
+                                    
+                                    Write-Host "  Changed password for admin: '$username'" -ForegroundColor Magenta
+                                    "`n  Changed password for admin: $username on $computer" >> $logPath
+                                } catch {
+                                    Write-Host "  Failed to change password for admin: $username - $($_.Exception.Message)" -ForegroundColor Red
+                                    "`n  Failed to change password for admin: $username on $computer - $($_.Exception.Message)" >> $logPath
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Write-Host "  $computer user management completed successfully" -ForegroundColor Green
+                "`n  $computer user management completed successfully" >> $logPath
+
+            } catch {
+                Write-Host "  Failed to manage users on $computer : $($_.Exception.Message)" -ForegroundColor Red
+                "`n  Failed to manage users on $computer : $($_.Exception.Message)" >> $logPath
+            }
+        }
+
+        "`n<--------------------------------------------->`nEnd Remote Machine Local Users Fixing" >> $logPath
     }
 }
 

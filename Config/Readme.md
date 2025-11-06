@@ -60,6 +60,10 @@ Optional settings are down below
 
 ## Auto Fix
 
+Similar replica to AutoDiagnostics <br>
+Difference is this makes changes to your systems foretold by the AutoDiagnostics script <br>
+Can horrificly mess up your machine if you enable things that should not be enabled with this config <br>
+
 ### set_local_users (True, False, Ask)
 - Sets local users based on the users defined in the local_admins/users files <br>
 - WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
@@ -67,6 +71,11 @@ Optional settings are down below
 ### set_domain_users (True, False, Ask)
 - Sets domain users based on the users defined in the domain admins/users files <br>
 - WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
+
+### set_remote_users (True, False, Ask)
+- Sets local users on other machines based on the Local users/admins files <br>
+- WARNING: Can be horrific if stopped mid way, cause ya know, its editing other users on other MACHINES <br>
+
 ### enable_firewall (True, False, Ask)
 - Enables the firewall with a bunch of rules set <br>
 - Most deadly, could block a needed port <br>

@@ -1,2 +1,0 @@
-LocalAdmin1
-LocalAdmin2

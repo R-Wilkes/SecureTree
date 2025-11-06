@@ -1658,7 +1658,10 @@ else{
             Write-Host "Enable-NetFirewallRule -DisplayGroup 'Remote Scheduled Tasks Management'"
             Write-Host "Start-Service -Name RemoteRegistry"
             Write-Host "Set-Service -Name RemoteRegistry -StartupType Automatic"
-
+            Write-Host "`n"
+            Write-Host "Also have to make sure your in the correct group on the local machine"
+            Write-Host "net localgroup administrators 'JJM\Domain Admins' /add"
+            Write-Host "Run that command on the machine you need to edit if you get an access is denied error"
 
             Read-Host -Prompt "Press enter to exit"
 
