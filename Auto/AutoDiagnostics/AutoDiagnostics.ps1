@@ -407,6 +407,91 @@ else{
 
 }
 
+# Checks reg keys | AI
+if ($true){
+
+    Write-Host "`n Check Reg Keys..." -ForegroundColor Cyan
+    "`nChecking Reg Keys `n<--------------------------------------------->" >> $logPath
+
+
+    # Check common startup registry locations
+    $startupKeys = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunServices",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunServicesOnce",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunServices",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunServicesOnce"
+    )
+
+    foreach ($key in $startupKeys) {
+        try {
+            $entries = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+            if ($entries) {
+                Write-Host "`n[$key]" -ForegroundColor Yellow
+                "`nKey: $key" >> $logPath
+
+                
+                $entries.PSObject.Properties | Where-Object { $_.Name -notmatch "^PS" } | ForEach-Object {
+                    $name = $_.Name
+                    $value = $_.Value
+                    
+                    # Flag suspicious patterns
+                    $suspicious = $false
+                    $reasons = @()
+                    
+                    if ($value -match "temp|tmp|appdata\\local\\temp") { $suspicious = $true; $reasons += "TEMP_PATH" }
+                    if ($value -match "\.bat|\.cmd|\.vbs|\.js|\.ps1") { $suspicious = $true; $reasons += "SCRIPT_FILE" }
+                    if ($value -match "powershell|cmd\.exe|wscript|cscript") { $suspicious = $true; $reasons += "SCRIPT_EXEC" }
+                    if ($value -match "hidden|windowstyle|bypass|executionpolicy") { $suspicious = $true; $reasons += "HIDDEN_EXEC" }
+                    if ($value -match "download|curl|wget|invoke-webrequest") { $suspicious = $true; $reasons += "DOWNLOAD" }
+                    if ($value -match "base64|encoded") { $suspicious = $true; $reasons += "ENCODED" }
+                    if ($value -match "\\\\|ftp://|http://") { $suspicious = $true; $reasons += "REMOTE_PATH" }
+                    
+                    $color = if ($suspicious) { "Red" } else { "White" }
+                    $flag = if ($suspicious) { " [SUSPICIOUS: $($reasons -join ',')]" } else { "" }
+                    
+                    Write-Host "  $name = $value$flag" -ForegroundColor $color
+                    " $name = $value$flag" >> $logPath
+
+                }
+            }
+        } catch {
+            Write-Host "Cannot access: $key" -ForegroundColor Gray
+        }
+    }
+
+    # Check Windows startup folder
+    $startupFolders = @(
+        "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup",
+        "$env:ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup"
+    )
+
+    foreach ($folder in $startupFolders) {
+        if (Test-Path $folder) {
+            $files = Get-ChildItem -Path $folder -ErrorAction SilentlyContinue
+            if ($files) {
+                Write-Host "`n[STARTUP FOLDER: $folder]" -ForegroundColor Yellow
+                "`nStartup Folder: $folder" >> $logPath
+                foreach ($file in $files) {
+                    $suspicious = $file.Extension -match "\.(bat|cmd|vbs|js|ps1)$"
+                    $color = if ($suspicious) { "Red" } else { "White" }
+                    $flag = if ($suspicious) { " [SUSPICIOUS: SCRIPT_FILE]" } else { "" }
+                    Write-Host "  $($file.Name)$flag" -ForegroundColor $color
+                    " $($file.Name)$flag" >> $logPath
+                }
+            }
+        }
+    }
+
+    "`n<---------------------------------------------> `nEnd Reg Keys" >> $logPath
+
+}
+
 # Opens new terminal for logging monitoring, only on the Domain Controller
 if ((IsDC)){
 

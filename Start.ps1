@@ -112,7 +112,7 @@ $env:SecureTree_ComputerName = $computerName
 $env:SecureTree_RootPath = $rootPath
 
 # Pretend you don't see this red team :)
-$global:scriptDefaultPassword = ConvertTo-SecureString "CybersecurityRules69" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
+$global:scriptDefaultPassword = ConvertTo-SecureString "ChangeMe42069" -AsPlainText -Force # Maybe want to obscure this, cause if red-team gets ahold of this script im cooked
 
 # -----------------------------------------
 
@@ -2505,7 +2505,7 @@ else{
                         BuildSubTerminalText -Text "GPO update initiated on selected computer(s)."
                     }
 
-                    # Wallpaper Settings
+                    # Wallpaper Settings | AI
                     elseif ($choice -eq "2"){
 
                         "[" + (Get-CurrentTime) + "] $curuser Entered Wallpaper settings" >> $manLog
@@ -2562,7 +2562,7 @@ else{
                         }
                     }
 
-                    # Useful domain controller terminals
+                    # Useful domain controller terminals | AI
                     elseif ($choice -eq "3"){
 
                         "[" + (Get-CurrentTime) + "] $curuser Entered Domain Useful Terminals" >> $manLog
@@ -2716,8 +2716,20 @@ else{
                                                 $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
                                                     try {
                                                         $connections = Get-NetTCPConnection | Where-Object { $_.State -eq "Listen" } | Select-Object -First 20
-                                                        $ports = $connections.LocalPort | Sort-Object -Unique
-                                                        return "SUCCESS: Open ports (first 20): $($ports -join ', ')"
+                                                        $portProcessInfo = @()
+                                                        
+                                                        foreach ($conn in $connections) {
+                                                            try {
+                                                                $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+                                                                $processName = if ($process) { $process.ProcessName } else { "Unknown" }
+                                                                $portProcessInfo += "$($conn.LocalPort):$processName"
+                                                            } catch {
+                                                                $portProcessInfo += "$($conn.LocalPort):Unknown"
+                                                            }
+                                                        }
+                                                        
+                                                        $uniquePorts = $portProcessInfo | Sort-Object -Unique
+                                                        return "SUCCESS: Open ports with processes (first 20): $($uniquePorts -join ', ')"
                                                     } catch {
                                                         return "ERROR: $($_.Exception.Message)"
                                                     }
@@ -2915,11 +2927,11 @@ else{
                                                 $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
                                                     try {
                                                         # Placeholder password policy commands
-                                                        net accounts /minpwlen:8 | Out-Null
-                                                        net accounts /maxpwage:90 | Out-Null
-                                                        net accounts /minpwage:1 | Out-Null
-                                                        net accounts /uniquepw:12 | Out-Null
-                                                        net accounts /lockoutthreshold:5 | Out-Null
+                                                        net accounts /minpwlen:(Config("min_password_length")) | Out-Null
+                                                        net accounts /maxpwage:(Config("max_password_age")) | Out-Null
+                                                        net accounts /minpwage:(Config("min_password_age")) | Out-Null
+                                                        net accounts /uniquepw:(Config("unique_password")) | Out-Null
+                                                        net accounts /lockoutthreshold:(Config("lock_out_threshold")) | Out-Null
                                                         return "SUCCESS: Password policy configured"
                                                     } catch {
                                                         return "ERROR: $($_.Exception.Message)"
