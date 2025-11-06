@@ -2250,6 +2250,10 @@ else{
                             BuildSubTerminalText -Text  "On Windows Home, Local Users and Groups not Available in sub terminal" 
                         }
 
+                        elseif (IsDC){
+                            BuildSubTerminalText -Text  "On a Domain Controller, Local Users and Groups not Available in sub terminal" 
+                        }
+
                         else{
 
                             "[" + (Get-CurrentTime) + "] $curuser Opened Group Edit" >> $manLog
@@ -2436,7 +2440,7 @@ else{
                 
                 While ($true){
                 
-                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Wallpaper Settings `n 3) Exit")
+                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Wallpaper Settings `n 3) Terminals `n 4) Remote Commands `n 5) Exit")
                     
                     # invoke GPO update on selected computers | AI
                     if ($choice -eq "1"){
@@ -2501,7 +2505,8 @@ else{
                         BuildSubTerminalText -Text "GPO update initiated on selected computer(s)."
                     }
 
-                    if ($choice -eq "2"){
+                    # Wallpaper Settings
+                    elseif ($choice -eq "2"){
 
                         "[" + (Get-CurrentTime) + "] $curuser Entered Wallpaper settings" >> $manLog
 
@@ -2557,8 +2562,803 @@ else{
                         }
                     }
 
+                    # Useful domain controller terminals
+                    elseif ($choice -eq "3"){
+
+                        "[" + (Get-CurrentTime) + "] $curuser Entered Domain Useful Terminals" >> $manLog
+
+                        While ($true){
+                        
+                            $choice = BuildSubOptionFrame(" 1) AD Users and Groups `n 2) Remote Desktop Connections `n 3) Group Policy Editor `n 4) Exit")
+
+                            # AD Users and groups
+                            if ($choice -eq "1") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Opened AD users and groups" >> $manLog
+                                Start-Process dsa.msc
+
+                            }
+
+                            
+                            # RDC
+                            elseif ($choice -eq "2") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Opened RDP" >> $manLog
+                                Start-Process mstsc
+
+                            }
+
+                            
+                            # Group Policy Editor
+                            elseif ($choice -eq "3") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Opened Group Policy Editor" >> $manLog
+                                Start-Process gpedit.msc
+
+                            }
+
+                            # Exit
+                            elseif ($choice -eq "4") {
+
+                                "[" + (Get-CurrentTime) + "] $curuser Exited Domain Useful Terminals" >> $manLog
+                                break
+
+                            }
+                        }
+                    }
+
+                    # Remote Command Execution on Domain Machines | AI
+                    elseif ($choice -eq "4") {
+
+                        "[" + (Get-CurrentTime) + "] $curuser Entered Remote Command Execution" >> $manLog
+
+                        :remoteCommandEdit while ($true){
+
+                            # Select target computer first
+                            try {
+                                $domainComputers = Get-ADComputer -Filter * | Where-Object { $_.Name -ne $env:COMPUTERNAME } | Select-Object -ExpandProperty Name
+                            } catch {
+                                BuildSubTerminalText -Text "Failed to query domain computers"
+                                WriteErrorLog -ErrorRecord $_
+                                continue
+                            }
+
+                            if (-not $domainComputers -or $domainComputers.Count -eq 0) {
+                                BuildSubTerminalText -Text "No domain computers found"
+                                continue
+                            }
+
+                            $computerString = FormatArrayToString -Array $domainComputers
+                            $computerChoice = BuildSubOptionFrame($computerString)
+
+                            # Exit if user chose to cancel
+                            if ($computerChoice -eq ($domainComputers.Length + 1)) {
+                                "[" + (Get-CurrentTime) + "] $curuser is done with remote commands" >> $manLog
+                                break remoteCommandEdit
+                            }
+
+                            $selectedComputer = $domainComputers[$computerChoice - 1]
+                            
+                            # Test connectivity first
+                            if (-not (Test-Connection -ComputerName $selectedComputer -Count 1 -Quiet)) {
+                                BuildSubTerminalText -Text "Cannot reach computer: $selectedComputer"
+                                continue
+                            }
+
+                            "[" + (Get-CurrentTime) + "] $curuser Selected target computer: $selectedComputer" >> $manLog
+
+                            # Remote command execution menu
+                            While ($True) {
+
+                                ScreenClear
+                                Write-Progress -Activity "Remote Command Execution" -Status "Target: $selectedComputer"
+                                
+                                $commandInput = BuildSubOptionFrame(" 1) Useful Commands `n 2) Security Commands `n 3) System Commands `n 4) Network Commands `n 5) Diagnostic Commands `n 6) Custom Command `n 7) Change Target Computer `n 8) Exit")
+                            
+                                # Useful commands
+                                if ($commandInput -eq "1"){
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Useful Commands on $selectedComputer" >> $manLog
+
+                                    While ($True) {
+
+                                        ScreenClear
+                                        Write-Progress -Activity "Useful Commands" -Status "Target: $selectedComputer"
+                                        
+                                        $usefulChoice = BuildSubOptionFrame(" 1) Audit Services `n 2) Check Open Ports `n 3) System File Scan`n 4) Back to Main Menu")
+                                        
+                                        Write-Progress -Activity "Useful Commands" -Status "Target: $selectedComputer" -Completed
+                                        try {
+                                            
+                                            # Audit Services
+                                            if ($usefulChoice -eq "1") {
+
+                                                ScreenClear
+                                                Write-Host "Auditing Services on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $suspiciousServices = Get-Service | Where-Object { 
+                                                            $_.Status -eq "Running" -and 
+                                                            ($_.Name -match "suspicious|backdoor|malware|trojan|red|team|redteam|steam" -or 
+                                                            $_.DisplayName -match "suspicious|backdoor|malware|trojan|red|team|redteam|steam")
+                                                        }
+                                                        if ($suspiciousServices) {
+                                                            return "WARNING: Found suspicious services: $($suspiciousServices.Name -join ', ')"
+                                                        } else {
+                                                            return "SUCCESS: No suspicious services found"
+                                                        }
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } elseif ($result -like "WARNING:*") {
+                                                    Write-Host $result -ForegroundColor Yellow
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Audited Services on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+                                    
+                                            # Check Open Ports
+                                            elseif ($usefulChoice -eq "2") {
+
+                                                ScreenClear
+                                                Write-Host "Checking Open Ports on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $connections = Get-NetTCPConnection | Where-Object { $_.State -eq "Listen" } | Select-Object -First 20
+                                                        $ports = $connections.LocalPort | Sort-Object -Unique
+                                                        return "SUCCESS: Open ports (first 20): $($ports -join ', ')"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Checked Ports on $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Run SFC Scan
+                                            elseif ($usefulChoice -eq "3") {
+
+                                                ScreenClear
+                                                $AREYOUSURE = 2FA -Message "Are you sure you want to run SFC /scannow on $selectedComputer? This may take several minutes."
+
+                                                if ($AREYOUSURE -eq "Y") {
+
+                                                    Write-Host "Running SFC /scannow on $selectedComputer..." -ForegroundColor Yellow
+                                                    Write-Host "This may take several minutes, please wait..." -ForegroundColor Cyan
+                                                    
+                                                    $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                        try {
+                                                            # Run SFC scan and capture output
+                                                            $sfcOutput = & sfc /scannow 2>&1
+                                                            
+                                                            # Check the output for common results
+                                                            $outputString = $sfcOutput -join "`n"
+                                                            
+                                                            if ($outputString -match "Windows Resource Protection did not find any integrity violations") {
+                                                                return "SUCCESS: SFC scan completed - No integrity violations found"
+                                                            }
+                                                            elseif ($outputString -match "Windows Resource Protection found corrupt files and successfully repaired them") {
+                                                                return "SUCCESS: SFC scan completed - Found and repaired corrupt files"
+                                                            }
+                                                            elseif ($outputString -match "Windows Resource Protection found corrupt files but was unable to fix some of them") {
+                                                                return "WARNING: SFC scan completed - Found corrupt files but unable to fix some"
+                                                            }
+                                                            elseif ($outputString -match "Windows Resource Protection could not perform the requested operation") {
+                                                                return "ERROR: SFC scan failed - Could not perform operation (may need to run DISM first)"
+                                                            }
+                                                            else {
+                                                                return "SUCCESS: SFC scan completed - $($outputString.substring(100))"
+                                                            }
+                                                        } catch {
+                                                            return "ERROR: $($_.Exception.Message)"
+                                                        }
+                                                    } -ErrorAction Stop
+
+                                                    if ($result -like "SUCCESS:*") {
+                                                        Write-Host $result -ForegroundColor Green
+                                                    } elseif ($result -like "WARNING:*") {
+                                                        Write-Host $result -ForegroundColor Yellow
+                                                    } else {
+                                                        Write-Host $result -ForegroundColor Red
+                                                    }
+                                                    
+                                                    "[" + (Get-CurrentTime) + "] $curuser Ran SFC scan on $selectedComputer - $result" >> $manLog
+                                                    
+                                                    Write-Host "`nSFC scan log location: C:\Windows\Logs\CBS\CBS.log" -ForegroundColor Cyan
+                                                    Write-Host "Press Enter to continue"
+                                                    GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                                } else {
+                                                    "[" + (Get-CurrentTime) + "] $curuser Decided not to run SFC scan on $selectedComputer" >> $manLog
+                                                }
+                                            }
+
+                                            # Back to Main Menu
+                                            elseif ($usefulChoice -eq "4") {
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited Useful Commands" >> $manLog
+                                                Write-Progress -Activity "Useful Commands" -Completed
+                                                break
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute security command on remote computer"
+                                        }
+                                    }
+                                }
+
+                                # Security Commands
+                                elseif ($commandInput -eq "2") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Security Commands on $selectedComputer" >> $manLog
+
+                                    While ($True) {
+
+                                        ScreenClear
+                                        Write-Progress -Activity "Security Commands" -Status "Target: $selectedComputer"
+                                        
+                                        $securityChoice = BuildSubOptionFrame(" 1) Disable Guest Account `n 2) Enable Windows Firewall `n 3) Disable AutoRun `n 4) Set Password Policy `n 5) Check User Accounts `n 6) Back to Main Menu")
+                                    
+                                        Write-Progress -Activity "Security Commands" -Status "Target: $selectedComputer" -Completed
+
+                                        try {
+                                            
+                                            # Disable Guest Account
+                                            if ($securityChoice -eq "1") {
+
+                                                ScreenClear
+                                                Write-Host "Disabling Guest Account on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        Disable-LocalUser -Name "Guest" -ErrorAction SilentlyContinue
+                                                        return "SUCCESS: Guest account disabled"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Disabled Guest Account on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+                                        
+                                            # Enable Windows Firewall
+                                            elseif ($securityChoice -eq "2") {
+
+                                                ScreenClear
+                                                Write-Host "Enabling Windows Firewall on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+                                                        return "SUCCESS: Windows Firewall enabled for all profiles"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Enabled Firewall on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+                                
+                                            # Disable AutoRun
+                                            elseif ($securityChoice -eq "3") {
+
+                                                ScreenClear
+                                                Write-Host "Disabling AutoRun on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Force | Out-Null
+                                                        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun" -Value 255
+                                                        return "SUCCESS: AutoRun disabled for all drives"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Disabled AutoRun on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Set Password Policy
+                                            elseif ($securityChoice -eq "4") {
+
+                                                ScreenClear
+                                                Write-Host "Configuring Password Policy on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        # Placeholder password policy commands
+                                                        net accounts /minpwlen:8 | Out-Null
+                                                        net accounts /maxpwage:90 | Out-Null
+                                                        net accounts /minpwage:1 | Out-Null
+                                                        net accounts /uniquepw:12 | Out-Null
+                                                        net accounts /lockoutthreshold:5 | Out-Null
+                                                        return "SUCCESS: Password policy configured"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Set Password Policy on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Check User Accounts
+                                            elseif ($securityChoice -eq "5") {
+
+                                                ScreenClear
+                                                Write-Host "Checking User Accounts on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $users = Get-LocalUser | Where-Object { $_.Enabled -eq $true }
+                                                        $adminUsers = Get-LocalGroupMember -Group "Administrators" | Select-Object -ExpandProperty Name
+                                                        return "SUCCESS: Found $($users.Count) enabled users, $($adminUsers.Count) administrators"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Checked User Accounts on $selectedComputer - $result" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Back to Main Menu
+                                            elseif ($securityChoice -eq "6") {
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited Security Commands" >> $manLog
+                                                Write-Progress -Activity "Security Commands" -Completed
+                                                break
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute security command on remote computer"
+                                        }
+                                    }
+                                }
+                                
+                                # System Commands
+                                elseif ($commandInput -eq "3") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered System Commands on $selectedComputer" >> $manLog
+
+                                    While ($True) {
+
+                                        ScreenClear
+                                        Write-Progress -Activity "System Commands" -Status "Target: $selectedComputer"
+                                        
+                                        $systemChoice = BuildSubOptionFrame(" 1) Get System Info `n 2) Restart Computer `n 3) Check Uptime `n 4) Back to Main Menu")
+                                    
+                                        Write-Progress -Activity "System Commands" -Status "Target: $selectedComputer" -Completed
+                                        
+                                        try {
+                                            
+                                            # Get System Info
+                                            if ($systemChoice -eq "1") {
+
+                                                ScreenClear
+                                                Write-Host "Getting System Information from $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $os = Get-CimInstance -ClassName Win32_OperatingSystem
+                                                        $computer = Get-CimInstance -ClassName Win32_ComputerSystem
+                                                        return "SUCCESS: OS: $($os.Caption), RAM: $([math]::Round($computer.TotalPhysicalMemory/1GB,2))GB, Uptime: $((Get-Date) - $os.LastBootUpTime)"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Got System Info from $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Restart Computer
+                                            elseif ($systemChoice -eq "2") {
+
+                                                ScreenClear
+                                                $AREYOUSURE = 2FA -Message "Are you sure you want to restart $selectedComputer?"
+
+                                                if ($AREYOUSURE -eq "Y") {
+
+                                                    Write-Host "Restarting $selectedComputer..." -ForegroundColor Red
+                                                    
+                                                    try {
+                                                        Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                            Restart-Computer -Force
+                                                        } -ErrorAction Stop
+
+                                                        Write-Host "Restart command sent to $selectedComputer" -ForegroundColor Green
+                                                        "[" + (Get-CurrentTime) + "] $curuser Restarted $selectedComputer" >> $manLog
+                                                        
+                                                        Write-Host "Press Enter to continue"
+                                                        GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                                    } catch {
+                                                        WriteErrorLog -ErrorRecord $_
+                                                        BuildSubTerminalText -Text "Failed to restart remote computer"
+                                                    }
+                                                } else {
+                                                    "[" + (Get-CurrentTime) + "] $curuser Decided not to restart $selectedComputer" >> $manLog
+                                                }
+                                            }
+
+                                            # Check Uptime
+                                            elseif ($systemChoice -eq "3") {
+
+                                                ScreenClear
+                                                Write-Host "Checking Uptime on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $os = Get-CimInstance -ClassName Win32_OperatingSystem
+                                                        $uptime = (Get-Date) - $os.LastBootUpTime
+                                                        return "SUCCESS: Uptime: $($uptime.Days) days, $($uptime.Hours) hours, $($uptime.Minutes) minutes"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Checked Uptime on $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+                                    
+                                            # Back to Main Menu
+                                            elseif ($systemChoice -eq "4") {
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited System Commands" >> $manLog
+                                                Write-Progress -Activity "System Commands" -Completed
+                                                break
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute system command on remote computer"
+                                        }
+                                    }
+                                }
+
+                                # Network Commands
+                                elseif ($commandInput -eq "4") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Network Commands on $selectedComputer" >> $manLog
+
+                                    While ($True) {
+
+                                        ScreenClear
+                                        Write-Progress -Activity "Network Commands" -Status "Target: $selectedComputer"
+                                        
+                                        $networkChoice = BuildSubOptionFrame(" 1) Get IP Configuration `n 2) Flush DNS `n 3) Back to Main Menu")
+                                    
+                                        try {
+                                            
+                                            # Get IP Configuration
+                                            if ($networkChoice -eq "1") {
+
+                                                ScreenClear
+                                                Write-Host "Getting IP Configuration from $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $adapters = Get-NetIPAddress | Where-Object { $_.AddressFamily -eq "IPv4" -and $_.IPAddress -ne "127.0.0.1" }
+                                                        $ipInfo = $adapters | ForEach-Object { "$($_.InterfaceAlias): $($_.IPAddress)" }
+                                                        return "SUCCESS: IP Configuration - $($ipInfo -join ', ')"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Got IP Config from $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Flush DNS
+                                            elseif ($networkChoice -eq "2") {
+
+                                                ScreenClear
+                                                Write-Host "Flushing DNS on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        Clear-DnsClientCache
+                                                        return "SUCCESS: DNS cache flushed"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Flushed DNS on $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Back to Main Menu
+                                            elseif ($networkChoice -eq "3") {
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited Network Commands" >> $manLog
+                                                Write-Progress -Activity "Network Commands" -Completed
+                                                break
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute network command on remote computer"
+                                        }
+                                    }
+                                }
+
+                                # Diagnostic Commands
+                                elseif ($commandInput -eq "5") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Diagnostic Commands on $selectedComputer" >> $manLog
+
+                                    While ($True) {
+
+                                        ScreenClear
+                                        Write-Progress -Activity "Diagnostic Commands" -Status "Target: $selectedComputer"
+                                        
+                                        $diagChoice = BuildSubOptionFrame(" 1) Check Event Logs `n 2) Get Running Processes `n 3) Check Services Status `n 4) Back to Main Menu")
+                                    
+                                        try {
+                                            
+                                            # Check Event Logs
+                                            if ($diagChoice -eq "1") {
+
+                                                ScreenClear
+                                                Write-Host "Checking Event Logs on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $errors = Get-WinEvent -LogName System -MaxEvents 10 | Where-Object { $_.LevelDisplayName -eq "Error" }
+                                                        $warnings = Get-WinEvent -LogName System -MaxEvents 10 | Where-Object { $_.LevelDisplayName -eq "Warning" }
+                                                        return "SUCCESS: Recent errors: $($errors.Count), warnings: $($warnings.Count)"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Checked Event Logs on $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Get Running Processes
+                                            elseif ($diagChoice -eq "2") {
+
+                                                ScreenClear
+                                                Write-Host "Getting Running Processes from $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $processes = Get-Process | Sort-Object CPU -Descending | Select-Object -First 10
+                                                        $topProc = $processes | ForEach-Object { "$($_.Name) ($($_.CPU))" }
+                                                        return "SUCCESS: Top processes by CPU: $($topProc -join ', ')"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Got Processes from $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Check Services Status
+                                            elseif ($diagChoice -eq "3") {
+
+                                                ScreenClear
+                                                Write-Host "Checking Services Status on $selectedComputer..." -ForegroundColor Yellow
+                                                
+                                                $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    try {
+                                                        $running = (Get-Service | Where-Object { $_.Status -eq "Running" }).Count
+                                                        $stopped = (Get-Service | Where-Object { $_.Status -eq "Stopped" }).Count
+                                                        return "SUCCESS: Services - Running: $running, Stopped: $stopped"
+                                                    } catch {
+                                                        return "ERROR: $($_.Exception.Message)"
+                                                    }
+                                                } -ErrorAction Stop
+
+                                                if ($result -like "SUCCESS:*") {
+                                                    Write-Host $result -ForegroundColor Green
+                                                } else {
+                                                    Write-Host $result -ForegroundColor Red
+                                                }
+                                                
+                                                "[" + (Get-CurrentTime) + "] $curuser Checked Services on $selectedComputer" >> $manLog
+                                                Write-Host "Press Enter to continue"
+                                                GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                            }
+
+                                            # Back to Main Menu
+                                            elseif ($diagChoice -eq "4") {
+                                                "[" + (Get-CurrentTime) + "] $curuser Exited Diagnostic Commands" >> $manLog
+                                                Write-Progress -Activity "Diagnostic Commands" -Completed
+                                                break
+                                            } 
+                                        }
+
+                                        catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute diagnostic command on remote computer"
+                                        }
+                                    }
+                                }
+
+                                # Custom Command
+                                elseif ($commandInput -eq "6") {
+
+                                    "[" + (Get-CurrentTime) + "] $curuser Entered Custom Command on $selectedComputer" >> $manLog
+
+                                    ScreenClear
+                                    $customCommand = CenterText -Text "Enter Custom Command for $selectedComputer" -PromptString "PowerShell Command"
+
+                                    if ($customCommand -ne "") {
+                                        try {
+                                            Write-Host "Executing custom command on $selectedComputer..." -ForegroundColor Yellow
+                                            
+                                            $result = Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                param($cmd)
+                                                try {
+                                                    $output = Invoke-Expression $cmd 2>&1
+                                                    if ($output) {
+                                                        return "SUCCESS: $($output | Out-String)"
+                                                    } else {
+                                                        return "SUCCESS: Command executed (no output)"
+                                                    }
+                                                } catch {
+                                                    return "ERROR: $($_.Exception.Message)"
+                                                }
+                                            } -ArgumentList $customCommand -ErrorAction Stop
+
+                                            if ($result -like "SUCCESS:*") {
+                                                Write-Host $result -ForegroundColor Green
+                                            } else {
+                                                Write-Host $result -ForegroundColor Red
+                                            }
+                                            
+                                            "[" + (Get-CurrentTime) + "] $curuser Executed custom command '$customCommand' on $selectedComputer" >> $manLog
+                                            Write-Host "Press Enter to continue"
+                                            GetKeyInput -AllowedKeys "`r" -Return $false
+
+                                        } catch {
+                                            WriteErrorLog -ErrorRecord $_
+                                            BuildSubTerminalText -Text "Failed to execute custom command on remote computer"
+                                        }
+                                    } else {
+                                        "[" + (Get-CurrentTime) + "] $curuser Did not provide custom command" >> $manLog
+                                    }
+                                }
+
+                                # Change target computer
+                                elseif ($commandInput -eq "7") {
+                                    "[" + (Get-CurrentTime) + "] $curuser Changing target computer from $selectedComputer" >> $manLog
+                                    Write-Progress -Activity "Remote Command Execution" -Completed
+                                    break
+                                }
+
+                                # Exit remote command configuration
+                                elseif ($commandInput -eq "8") {
+                                    "[" + (Get-CurrentTime) + "] $curuser Exited Remote Command Execution" >> $manLog
+                                    Write-Progress -Activity "Remote Command Execution" -Completed
+                                    break remoteCommandEdit
+                                }
+                            }
+                        }
+                    }
+
                     # Exits
-                    if ($choice -eq "3"){
+                    elseif ($choice -eq "5"){
                         "[" + (Get-CurrentTime) + "] $curuser Exited DC GPO Menu" >> $manLog
                         break
                     }
