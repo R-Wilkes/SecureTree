@@ -444,12 +444,12 @@ else{
 
                                                 $checkedPass = CheckPasswordDefault -TestPass $password
 
-                                                if ($checkedPass -ne $null){
+                                                if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                    # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                    $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
+                                                }
 
-                                                    if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
-                                                        # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
-                                                        $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
-                                                    }
+                                                if ($null -ne $checkedPass){
 
                                                     Set-LocalUser "$who" -Password $checkedPass 
 
@@ -736,12 +736,13 @@ else{
 
                                         $checkedPass = CheckPasswordDefault -TestPass $NewUserPassword
 
-                                        if ($checkedPass -ne $null){
+                                        if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                            #  AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                            $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1
+                                        }
 
-                                            if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
-                                                #  AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
-                                                $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1
-                                            }
+                                        if ($null -ne $checkedPass){
+                                        
 
                                             New-LocalUser "$NewUserName" -Password $checkedPass -FullName $NewUserName | Out-Null
                                             Add-LocalGroupMember -Group "Users" -Member "$NewUserName" | Out-Null
@@ -936,19 +937,20 @@ else{
                                                     
                                                     $checkedPass = CheckPasswordDefault -TestPass $password
 
-                                                    if ($checkedPass -ne $null){
-                                                        
-                                                        if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
-                                                            # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
-                                                            $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                              # Has to be third element idk why 
-                                                        }
+                                                    if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                        # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                        $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                              # Has to be third element idk why 
+                                                    }
+                                                    
+                                                    if ($null -ne $checkedPass){
 
                                                         Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
-                                                            param($username, $newPassword)
-                                                            Set-LocalUser $username -Password $newPassword
+                                                            param($username, $checkedPass)
+                                                            Set-LocalUser $username -Password $checkedPass
                                                         } -ArgumentList $who, $checkedPass -ErrorAction Stop
 
                                                         "[" + (Get-CurrentTime) + "] $curuser Changed Password for Remote User $who on $selectedComputer" >> $manLog
+                                                        
                                                     }
                                                 }
                                     
@@ -1035,15 +1037,24 @@ else{
                                         try{
                                             $NewUserPassword = CenterText -Text "Password for $NewUserName on $selectedComputer" -PromptString "Password" -SecureString $true
                                             
-                                            Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
-                                                param($username, $password, $fullname)
-                                                New-LocalUser $username -Password $password -FullName $fullname | Out-Null
-                                                Add-LocalGroupMember -Group "Users" -Member $username | Out-Null
-                                            } -ArgumentList $NewUserName, $NewUserPassword, $NewUserName -ErrorAction Stop
+                                            $checkedPass = CheckPasswordDefault -TestPass $NewUserPassword
 
-                                            "[" + (Get-CurrentTime) + "] $curuser Added new Remote User $NewUserName to Local Group Users on $selectedComputer" >> $manLog
-                                            Write-Host "Created user $NewUserName on $selectedComputer" -ForegroundColor Green
-                        
+                                            if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
+                                            }
+
+                                            if ($null -ne $checkedPass){
+
+                                                Invoke-Command -ComputerName $selectedComputer -ScriptBlock {
+                                                    param($username, $checkedPass, $fullname)
+                                                    New-LocalUser $username -Password $checkedPass -FullName $fullname | Out-Null
+                                                    Add-LocalGroupMember -Group "Users" -Member $username | Out-Null
+                                                } -ArgumentList $NewUserName, $checkedPass, $NewUserName -ErrorAction Stop
+
+                                                "[" + (Get-CurrentTime) + "] $curuser Added new Remote User $NewUserName to Local Group Users on $selectedComputer" >> $manLog
+                                                Write-Host "Created user $NewUserName on $selectedComputer" -ForegroundColor Green
+                                            }
                                         } catch {
                                             WriteErrorLog -ErrorRecord $_
                                             BuildSubTerminalText -Text "Failed to create user on remote computer"
@@ -1157,12 +1168,12 @@ else{
 
                                                     $checkedPass = CheckPasswordDefault -TestPass $newPassword
 
-                                                    if ($checkedPass -ne $null){
+                                                    if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
+                                                        # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
+                                                        $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
+                                                    }
 
-                                                        if ($checkedPass -is [System.Object[]] -and $checkedPass.Count -gt 0) {
-                                                            # AHHH, IDK WHY IT NEEDS THIS, JUST TRUST
-                                                            $checkedPass = $checkedPass | Where-Object { $_ -is [System.Security.SecureString] } | Select-Object -First 1                                                            
-                                                        }
+                                                    if ($null -ne $checkedPass){
 
                                                         Set-ADAccountPassword -Identity $who -NewPassword $checkedPass -Reset
                                                         Set-ADUser -Identity $who -ChangePasswordAtLogon $true
