@@ -34,9 +34,16 @@ if (-not (IsDC)){
     # Define paths to user and admin text files
     $userListPath = "$current_path/UserLists/Local_Users.txt"
     $adminListPath = "$current_path/UserLists/Local_Admins.txt"
+    $doNotTouchUsersPath = "$current_path/UserLists/No_Touch_Users.txt"
 
     # Ignore these users
     $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "dd-agent", "whiteteam"
+
+    $doNotTouchUsers =  Get-Content $doNotTouchUsersPath
+
+    foreach ($user in $doNotTouchUsers){
+        $usersToNotRemove += $user.trim();
+    }
 
     # Will just see if the user is in users to not remove
     function UserCheck {
@@ -208,9 +215,16 @@ if (IsDC) {
     # Define paths to user and admin text files
     $userListPath = "$current_path/UserLists/Domain_Users.txt"
     $adminListPath = "$current_path/UserLists/Domain_Admins.txt"
+    $doNotTouchUsersPath = "$current_path/UserLists/No_Touch_Users.txt"
 
-    # Ignore these users (domain format)
-    $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "dd-agent", "whiteteam"
+    # Ignore these users
+    $usersToNotRemove = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt"
+
+    $doNotTouchUsers =  Get-Content $doNotTouchUsersPath
+
+    foreach ($user in $doNotTouchUsers){
+        $usersToNotRemove += $user.trim();
+    }
 
     # Function to check if user should be protected
     function DomainUserCheck {
