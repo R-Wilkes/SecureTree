@@ -18,6 +18,7 @@ run_auto_fix = Ask
 ## AutoDiagnostics
 find_files = Ask
 run_winPEAS = Ask
+remote_users = Ask
 
 ## AutoFix
 set_local_users = Ask

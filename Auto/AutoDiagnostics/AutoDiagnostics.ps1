@@ -407,7 +407,7 @@ else{
 
 }
 
-# Opens new terminal for logging monitoring
+# Opens new terminal for logging monitoring, only on the Domain Controller
 if ((IsDC)){
 
     "`nStarted Accounts Log Monitoring" >> $logPath
@@ -425,6 +425,169 @@ if ((IsDC)){
 # Shows all programs on PC
 Get-Package -Provider Programs
 Get-WmiObject -Class Win32_Product | Select-Object -Property Name
+
+# Will report on Local users on other machines | AI
+if (IsDC){
+
+    if ((Config("remote_users"))){
+        
+        "`nRemote Machine Local Users Check `n<--------------------------------------------->" >> $logPath
+        Write-Host "Checking local users on remote domain machines..." -ForegroundColor Cyan
+
+        # Get all domain computers (excluding DCs and current machine)
+        try {
+            $domainComputers = Get-ADComputer -Filter * | Where-Object { 
+                $_.Name -ne $env:COMPUTERNAME -and 
+                $_.DistinguishedName -notlike "*Domain Controllers*" 
+            } | Select-Object -ExpandProperty Name
+        } catch {
+            Write-Host "Failed to get domain computers" -ForegroundColor Red
+            "`nFailed to get domain computers: $($_.Exception.Message)" >> $logPath
+            return
+        }
+
+        # Define paths for remote machine user lists
+        $remoteUserListPath = "$current_path/UserLists/Local_Users.txt"
+        $remoteAdminListPath = "$current_path/UserLists/Local_Admins.txt"
+
+        # Read remote user and admin lists (if they exist)
+        $remoteUsers = @()
+        $remoteAdmins = @()
+        
+        if (Test-Path $remoteUserListPath) {
+            $remoteUsers = Get-Content -Path $remoteUserListPath -ErrorAction SilentlyContinue
+        }
+        
+        if (Test-Path $remoteAdminListPath) {
+            $remoteAdmins = Get-Content -Path $remoteAdminListPath -ErrorAction SilentlyContinue
+        }
+
+        # Process each remote computer
+        foreach ($computer in $domainComputers) {
+            
+            Write-Host "Checking computer: $computer" -ForegroundColor Yellow
+            "`nChecking Remote Computer: $computer" >> $logPath
+
+            # Test connectivity first
+            if (-not (Test-Connection -ComputerName $computer -Count 1 -Quiet)) {
+                Write-Host "  $computer is not reachable" -ForegroundColor Red
+                "`n  $computer is not reachable" >> $logPath
+                continue
+            }
+
+            try {
+                # Get remote local users via Invoke-Command
+                $remoteData = Invoke-Command -ComputerName $computer -ScriptBlock {
+                    
+                    # Get all local users
+                    $allUsers = Get-LocalUser -ErrorAction SilentlyContinue
+                    
+                    # Get administrators
+                    $adminMembers = @()
+                    try {
+                        $adminGroup = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+                        $adminMembers = $adminGroup | ForEach-Object { 
+                            $_.Name.Split('\')[-1] 
+                        } | Where-Object { $_ -notmatch "^(NT AUTHORITY|BUILTIN)" }
+                    } catch {}
+                    
+                    # Get regular users
+                    $userMembers = @()
+                    try {
+                        $userGroup = Get-LocalGroupMember -Group "Users" -ErrorAction SilentlyContinue
+                        $userMembers = $userGroup | ForEach-Object { 
+                            $_.Name.Split('\')[-1] 
+                        } | Where-Object { $_ -notmatch "^(NT AUTHORITY|BUILTIN)" }
+                    } catch {}
+
+                    return @{
+                        AllUsers = $allUsers.Name
+                        Administrators = $adminMembers
+                        Users = $userMembers
+                        ComputerName = $env:COMPUTERNAME
+                    }
+                } -ErrorAction Stop
+
+                # Check for users that should exist but don't
+                foreach ($expectedUser in $remoteUsers) {
+                    if ($expectedUser -notin $remoteData.AllUsers) {
+                        $good = DomainUserCheck $expectedUser
+                        if ($good -eq $false) {
+                            Write-Host "  Should Create Local User on $($computer): '$expectedUser'" -ForegroundColor Yellow
+                            "`n  Should create Local User on $($computer): $expectedUser" >> $logPath
+                        }
+                    }
+                }
+
+                # Check for admins that should exist but don't
+                foreach ($expectedAdmin in $remoteAdmins) {
+                    if ($expectedAdmin -notin $remoteData.AllUsers) {
+                        $good = DomainUserCheck $expectedAdmin
+                        if ($good -eq $false) {
+                            Write-Host "  Should Create Local Admin on $($computer): '$expectedAdmin'" -ForegroundColor Yellow
+                            "`n  Should create Local Admin on $($computer): $expectedAdmin" >> $logPath
+                        }
+                    }
+                }
+
+                # Check for users that shouldn't exist (not in either list and not protected)
+                foreach ($actualUser in $remoteData.AllUsers) {
+                    if ($actualUser -notin $remoteUsers -and $actualUser -notin $remoteAdmins) {
+                        $good = DomainUserCheck $actualUser
+                        if ($good -eq $false) {
+                            if ($actualUser -notlike "*$*") {  # Skip computer accounts
+                                Write-Host "  Need to Remove Local User on $($computer): '$actualUser'" -ForegroundColor Red
+                                "`n  Remove Local User on $($computer): $actualUser" >> $logPath
+                            }
+                        }
+                    }
+                }
+
+                # Check for incorrect admin permissions
+                foreach ($actualAdmin in $remoteData.Administrators) {
+                    if ($actualAdmin -notin $remoteAdmins) {
+                        $good = DomainUserCheck $actualAdmin
+                        if ($good -eq $false) {
+                            Write-Host "  Need to Remove Admin Perms on $($computer): '$actualAdmin'" -ForegroundColor Red
+                            "`n  Remove Admin Perms on $($computer): $actualAdmin" >> $logPath
+                        }
+                    }
+                }
+
+                # Check for users who should have admin perms but don't
+                foreach ($expectedAdmin in $remoteAdmins) {
+                    if ($expectedAdmin -in $remoteData.AllUsers -and $expectedAdmin -notin $remoteData.Administrators) {
+                        $good = DomainUserCheck $expectedAdmin
+                        if ($good -eq $false) {
+                            Write-Host "  Need to Add Admin Perms on $($computer): '$expectedAdmin'" -ForegroundColor Yellow
+                            "`n  Add Admin Perms on $($computer): $expectedAdmin" >> $logPath
+                        }
+                    }
+                }
+
+                # Check for password changes needed
+                foreach ($user in ($remoteUsers + $remoteAdmins)) {
+                    if ($user -in $remoteData.AllUsers) {
+                        $good = DomainUserCheck $user
+                        if ($good -eq $false) {
+                            Write-Host "  Should change password on $computer for: '$user'" -ForegroundColor Magenta
+                            "`n  Change password on $computer for: $user" >> $logPath
+                        }
+                    }
+                }
+
+                Write-Host "  $computer check completed" -ForegroundColor Green
+                "`n  $computer check completed successfully" >> $logPath
+
+            } catch {
+                Write-Host "  Failed to check $($computer): $($_.Exception.Message)" -ForegroundColor Red
+                "`n  Failed to check $($computer): $($_.Exception.Message)" >> $logPath
+            }
+        }
+
+        "`n<--------------------------------------------->`nEnd Remote Machine Local Users Check" >> $logPath
+    }
+}
 
 Write-Host  "All Findings are logged`nLog Location: '$logPath'" -ForegroundColor Gray
 

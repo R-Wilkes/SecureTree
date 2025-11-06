@@ -36,12 +36,27 @@
 
 ## Auto Diagnostics
 
+Automatically checks domain and local users on the AD/DC <br>
+Along with Guest user and SMBv1, starts monitors <br>
+Also Prints out any installed programs <br>
+
+Keep in mind that on DC there are only domain users, local users do not exist for DC <br>
+Any machine under the domain is can have domain users and local users <br>
+
+Optional settings are down below
+
+
 ### find_files (True, False)
 - Allows the Auto1 Script to search the most important directory's for banned files, and will report them to you <br>
 
 ### run_winPEAS (True, False)
 - Will run the winPEAS script, meant for red-team, but should give some ideas of places need patching <br>
 - NOTE: Antivirus may flag it, thats why its in a zip <br>
+
+### remote_users (True, False Ask)
+- Will go through any machines connect to the domain and manage their local users <br>
+- Makes it easy to manage all local users on a domain rather than putting this script on each machine <br>
+- Takes a good amount of time tho <br>
 
 ## Auto Fix
 
