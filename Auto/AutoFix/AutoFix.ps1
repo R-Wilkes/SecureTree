@@ -748,6 +748,16 @@ if (IsDC){
     }
 }
 
+# Runs the password shuffle
+if ((Config("password_shuffle"))){
+
+    "`nStarted Password shuffle" >> $logPath
+
+    # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
+    Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPassShuffle.ps1"
+
+}
+
 # Enables all of the firewall rules I have stolen
 if ((Config("enable_firewall"))) {
 

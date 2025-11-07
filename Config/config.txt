@@ -28,6 +28,7 @@ enable_firewall = Ask
 run_service_config = Ask
 set_registry_keys = Ask
 run_policys = Ask
+password_shuffle = Ask
 
 ## Password policy's
 set_password_policy = Ask

@@ -12,7 +12,7 @@
 - Also have to wright injects and reports on what happens
 
 
-## Running the Start.ps1
+# Running the Start.ps1
 
 ### Starting
 Run as administrator Powershell terminal <br>
@@ -50,6 +50,12 @@ The readme for the config is in the config folder<br>
 ## Config Information
 
 Information on what the settings do in the config can be found [Here](Config/Readme.md "Config Settings")
+
+# Passwords
+
+Passwords are can be defined in this script, but will most likely be change when in comp <br>
+
+NOTE: Your not gonna find the passwords in this script, the passwords can be found [Here](https://www.youtube.com/watch?v=dQw4w9WgXcQ)  <br>
 
 # Users
 

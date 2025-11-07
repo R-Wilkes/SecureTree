@@ -92,6 +92,10 @@ Can horrificly mess up your machine if you enable things that should not be enab
 - Will only run if Auto Fix is true <br>
 - WARNING: This will break your computer somewhere, go for it anyway <br>
 
+### password_shuffle (True, False, Ask)
+- Automatically sets remote local users passwords constantly <br>
+- Hopefully delays red team <br>
+
 ## Password Policy's
 
 - Note that these only get set if Auto Fix is set to True
