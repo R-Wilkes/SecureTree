@@ -1931,7 +1931,7 @@ else{
 
                 ScreenClear
                 
-                $op = BuildSubOptionFrame(" 1) Run AutoDiagnostics.ps1 `n 2) Run AutoFix.ps1 `n 3) Run Policys.ps1 `n 4) Run LoginMonitor.ps1 `n 5) Run SystemChangeMonitor.ps1 `n 6) Run AutoPassShuffle.ps1 `n 7) Exit")
+                $op = BuildSubOptionFrame(" 1) Run AutoDiagnostics.ps1 `n 2) Run AutoFix.ps1 `n 3) Run Policys.ps1 `n 4) Run LoginMonitor.ps1 `n 5) Run SystemChangeMonitor.ps1 `n 6) Run AutoPassShuffle.ps1 `n 7) Run AutoPassShuffleDomain.ps1 `n 8) Exit")
     
                 # AutoDiagnostics
                 if ($op -eq "1") {
@@ -2002,7 +2002,7 @@ else{
 
                     if ((IsDC)){
 
-                        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPassShuffle.ps1"
+                        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffle.ps1"
 
                         # Manual Log
                         "[" + (Get-CurrentTime) + "] $curuser Ran AutoPassShuffle.ps1" >> $manLog
@@ -2014,8 +2014,25 @@ else{
                     }
                 }
 
-                # Exit
+                # AutoPassShuffleDomain
                 if ($op -eq "7") {
+
+                    if ((IsDC)){
+
+                        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffleDomain.ps1"
+
+                        # Manual Log
+                        "[" + (Get-CurrentTime) + "] $curuser Ran AutoPassShuffleDomain.ps1" >> $manLog
+
+                    }
+
+                    else{
+                        BuildSubTerminalText -Text "Not on a Domain Controller"
+                    }
+                }
+
+                # Exit
+                if ($op -eq "8") {
                     
                     $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Inquire
 

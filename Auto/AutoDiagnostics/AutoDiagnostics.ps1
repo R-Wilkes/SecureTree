@@ -410,7 +410,7 @@ else{
 # Checks reg keys | AI
 if ($true){
 
-    Write-Host "`n Check Reg Keys..." -ForegroundColor Cyan
+    Write-Host "`nCheck Reg Keys..." -ForegroundColor Cyan
     "`nChecking Reg Keys `n<--------------------------------------------->" >> $logPath
 
 

@@ -75,7 +75,7 @@ function BootupBackground{
         }
     }
 
-    # Kills all jobs and sets fast mode
+    # Sets fast mode and checks default password
     elseif ($LoadingProgress -gt 75 -and -not $global:killAllJobsRun){
         
         $global:killAllJobsRun = $true
@@ -91,6 +91,17 @@ function BootupBackground{
                 $global:longSleep | Out-Null
 
             }
+
+            # Security, I barley know her
+            $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($scriptDefaultPassword))
+            if ($plainPassword -eq "ChangeMe42069"){
+        
+                $plainPassword = $null
+                LoadingScreenQuery -Query "Script Default password has not been changed, Please change it ASAP" -Fatal $true
+                Exit
+                
+            }
+            $plainPassword = $null
         }
 
         catch{
