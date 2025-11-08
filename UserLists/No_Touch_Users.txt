@@ -2,3 +2,6 @@ dd-agent
 whiteteam
 cloudbase-init
 Domain Admins
+whiteteam
+blackteam
+greyteam
