@@ -55,10 +55,10 @@ function Start-PassShuffle {
     }
 
     # Define protected users (same as existing)
-    $doNotTouchUsersPath = "$current_path/UserLists/No_Touch_Users.txt"
+    $doNotTouchUsersPath = "./UserLists/No_Touch_Users.txt"
     $usersToNotChange = "Administrator", "DefaultAccount", "Guest", "WDAGUtilityAccount", "$curuser", "krbtgt", "$env:USERDOMAIN\Domain Admins"
 
-    $doNotTouchUsers = Get-Content $doNotTouchUsersPath -ErrorAction SilentlyContinue
+    $doNotTouchUsers = Get-Content $doNotTouchUsersPath
     foreach ($user in $doNotTouchUsers){
         $usersToNotChange += $user.trim()
     }

@@ -893,152 +893,155 @@ if ((Config("set_password_policy"))) {
 # Auto Configs services that I stole from someone else
 if ((Config("run_service_config"))) {
 
-    # Doing this to prevent stupid errors and panicking the user
-    # $ErrorActionPreference = [System.Management.Automation.ActionPreference]::SilentlyContinue
+    if ((2FA -Message "Are you sure you want to run service config?")){
 
-    "`n Services: "  >> $logPath
+        # Doing this to prevent stupid errors and panicking the user
+        # $ErrorActionPreference = [System.Management.Automation.ActionPreference]::SilentlyContinue
 
-    #Set Services
-    $s = Get-Service -Name "TermService"
-    Stop-Service -InputObject $s -Force
-    Set-Service TermService -StartupType Disabled
-    " Remote Desktop Services Stopped and Disabled"  >> $logPath
+        "`n Services: "  >> $logPath
 
-    $s2 = Get-Service -Name "RemoteRegistry"
-    Stop-Service -InputObject $s2 -Force
-    Set-Service RemoteRegistry -StartupType Disabled
-    " Remote Registry Stopped and Disabled"  >> $logPath
+        #Set Services
+        $s = Get-Service -Name "TermService"
+        Stop-Service -InputObject $s -Force
+        Set-Service TermService -StartupType Disabled
+        " Remote Desktop Services Stopped and Disabled"  >> $logPath
 
-    $s3 = Get-Service -Name "RpcLocator"
-    Stop-Service -InputObject $s3 -Force
-    Set-Service RpcLocator -StartupType Disabled
-    " Remote Procedure Call (RPC) Locator Stopped and Disabled"  >> $logPath
+        $s2 = Get-Service -Name "RemoteRegistry"
+        Stop-Service -InputObject $s2 -Force
+        Set-Service RemoteRegistry -StartupType Disabled
+        " Remote Registry Stopped and Disabled"  >> $logPath
 
-    $s4 = Get-Service -Name "wuauserv"
-    start-Service -InputObject $s4 
-    Set-Service RpcLocator -StartupType Automatic
-    " Windows Update is Started and Set to Automatic start" >> $logPath
+        $s3 = Get-Service -Name "RpcLocator"
+        Stop-Service -InputObject $s3 -Force
+        Set-Service RpcLocator -StartupType Disabled
+        " Remote Procedure Call (RPC) Locator Stopped and Disabled"  >> $logPath
 
-    $s5 = Get-Service -Name "SharedAccess"
-    Stop-Service -InputObject $s5 -Force
-    Set-Service SharedAccess -StartupType Disabled
-    " Internet Connection Sharing (ICS) Stopped and Disabled" >> $logPath
+        $s4 = Get-Service -Name "wuauserv"
+        start-Service -InputObject $s4 
+        Set-Service RpcLocator -StartupType Automatic
+        " Windows Update is Started and Set to Automatic start" >> $logPath
 
-    $s6 = Get-Service -Name "SessionEnv"
-    Stop-Service -InputObject $s6 -Force
-    Set-Service SessionEnv -StartupType Disabled
-    " Remote Desktop Configuration Stopped and Disabled"  >> $logPath
+        $s5 = Get-Service -Name "SharedAccess"
+        Stop-Service -InputObject $s5 -Force
+        Set-Service SharedAccess -StartupType Disabled
+        " Internet Connection Sharing (ICS) Stopped and Disabled" >> $logPath
 
-    $s7 = Get-Service -Name "SSDPSRV"
-    Stop-Service -InputObject $s7 -Force
-    Set-Service SSDPSRV -StartupType Disabled
-    " SSDP Discovery Stopped and Disabled"  >> $logPath
+        $s6 = Get-Service -Name "SessionEnv"
+        Stop-Service -InputObject $s6 -Force
+        Set-Service SessionEnv -StartupType Disabled
+        " Remote Desktop Configuration Stopped and Disabled"  >> $logPath
 
-    $s8 = Get-Service -Name "upnphost"
-    Stop-Service -InputObject $s8 -Force
-    Set-Service upnphost -StartupType Disabled
-    " UPnP Device Host Stopped and Disabled" >> $logPath
+        $s7 = Get-Service -Name "SSDPSRV"
+        Stop-Service -InputObject $s7 -Force
+        Set-Service SSDPSRV -StartupType Disabled
+        " SSDP Discovery Stopped and Disabled"  >> $logPath
 
-    $s9 = Get-Service -Name "EventLog"
-    start-Service -InputObject $s9 
-    Set-Service EventLog -StartupType Automatic
-    " Windows EventLog is Started and Set to Automatic start">> $logPath
+        $s8 = Get-Service -Name "upnphost"
+        Stop-Service -InputObject $s8 -Force
+        Set-Service upnphost -StartupType Disabled
+        " UPnP Device Host Stopped and Disabled" >> $logPath
 
-    $s10 = Get-Service -Name "DcpSvc"
-    Stop-Service -InputObject $s10 -Force
-    Set-Service DcpSvc -StartupType Disabled
-    " Data Collection and Publishing Service Stopped and Disabled">> $logPath
+        $s9 = Get-Service -Name "EventLog"
+        start-Service -InputObject $s9 
+        Set-Service EventLog -StartupType Automatic
+        " Windows EventLog is Started and Set to Automatic start">> $logPath
 
-    $s11 = Get-Service -Name "DiagTrack"
-    Stop-Service -InputObject $s11 -Force
-    Set-Service DiagTrack -StartupType Disabled
-    " Diagnostics Tracking Service Stopped and Disabled">> $logPath
+        $s10 = Get-Service -Name "DcpSvc"
+        Stop-Service -InputObject $s10 -Force
+        Set-Service DcpSvc -StartupType Disabled
+        " Data Collection and Publishing Service Stopped and Disabled">> $logPath
 
-    $s12 = Get-Service -Name "SensrSvc"
-    Stop-Service -InputObject $s12 -Force
-    Set-Service SensrSvc -StartupType Disabled
-    " Monitors Various Sensors Stopped and Disabled">> $logPath
+        $s11 = Get-Service -Name "DiagTrack"
+        Stop-Service -InputObject $s11 -Force
+        Set-Service DiagTrack -StartupType Disabled
+        " Diagnostics Tracking Service Stopped and Disabled">> $logPath
 
-    $s13 = Get-Service -Name "dmwappushservice"
-    Stop-Service -InputObject $s13  -Force
-    Set-Service dmwappushservice -StartupType Disabled
-    " Push Message Routing Service Stopped and Disabled">> $logPath
+        $s12 = Get-Service -Name "SensrSvc"
+        Stop-Service -InputObject $s12 -Force
+        Set-Service SensrSvc -StartupType Disabled
+        " Monitors Various Sensors Stopped and Disabled">> $logPath
 
-    $s14 = Get-Service -Name "lfsvc"
-    Stop-Service -InputObject $s14  -Force
-    Set-Service lfsvc -StartupType Disabled
-    " Geolocation Service Stopped and Disabled">> $logPath
+        $s13 = Get-Service -Name "dmwappushservice"
+        Stop-Service -InputObject $s13  -Force
+        Set-Service dmwappushservice -StartupType Disabled
+        " Push Message Routing Service Stopped and Disabled">> $logPath
 
-    $s15 = Get-Service -Name "MapsBroker"
-    Stop-Service -InputObject $s15  -Force
-    Set-Service MapsBroker -StartupType Disabled
-    " Downloaded Maps Manager Stopped and Disabled">> $logPath
+        $s14 = Get-Service -Name "lfsvc"
+        Stop-Service -InputObject $s14  -Force
+        Set-Service lfsvc -StartupType Disabled
+        " Geolocation Service Stopped and Disabled">> $logPath
 
-    $s16 = Get-Service -Name "NetTcpPortSharing"
-    Stop-Service -InputObject $s16  -Force
-    Set-Service NetTcpPortSharing -StartupType Disabled
-    " Net.Tcp Port Sharing Service Stopped and Disabled">> $logPath
+        $s15 = Get-Service -Name "MapsBroker"
+        Stop-Service -InputObject $s15  -Force
+        Set-Service MapsBroker -StartupType Disabled
+        " Downloaded Maps Manager Stopped and Disabled">> $logPath
 
-    $s17 = Get-Service -Name "RemoteAccess"
-    Stop-Service -InputObject $s17  -Force
-    Set-Service RemoteAccess -StartupType Disabled
-    " Routing and Remote Access Stopped and Disabled">> $logPath
+        $s16 = Get-Service -Name "NetTcpPortSharing"
+        Stop-Service -InputObject $s16  -Force
+        Set-Service NetTcpPortSharing -StartupType Disabled
+        " Net.Tcp Port Sharing Service Stopped and Disabled">> $logPath
 
-    $s18 = Get-Service -Name "TrkWks"
-    Stop-Service -InputObject $s18  -Force
-    Set-Service TrkWks -StartupType Disabled
-    " Distributed Link Tracking Client Stopped and Disabled">> $logPath
+        $s17 = Get-Service -Name "RemoteAccess"
+        Stop-Service -InputObject $s17  -Force
+        Set-Service RemoteAccess -StartupType Disabled
+        " Routing and Remote Access Stopped and Disabled">> $logPath
 
-    $s19 = Get-Service -Name "WbioSrvc"
-    Stop-Service -InputObject $s19  -Force
-    Set-Service WbioSrvc -StartupType Disabled
-    " Windows Biometric Service Stopped and Disabled">> $logPath
+        $s18 = Get-Service -Name "TrkWks"
+        Stop-Service -InputObject $s18  -Force
+        Set-Service TrkWks -StartupType Disabled
+        " Distributed Link Tracking Client Stopped and Disabled">> $logPath
 
-    $s20 = Get-Service -Name "WMPNetworkSvc"
-    Stop-Service -InputObject $s20  -Force
-    Set-Service WMPNetworkSvc -StartupType Disabled
-    " Windows Media Player Network Sharing Service Stopped and Disabled">> $logPath
+        $s19 = Get-Service -Name "WbioSrvc"
+        Stop-Service -InputObject $s19  -Force
+        Set-Service WbioSrvc -StartupType Disabled
+        " Windows Biometric Service Stopped and Disabled">> $logPath
 
-    $s21 = Get-Service -Name "WSearch"
-    Stop-Service -InputObject $s21  -Force
-    Set-Service WSearch -StartupType Disabled
-    " Windows Search Stopped and Disabled">> $logPath
+        $s20 = Get-Service -Name "WMPNetworkSvc"
+        Stop-Service -InputObject $s20  -Force
+        Set-Service WMPNetworkSvc -StartupType Disabled
+        " Windows Media Player Network Sharing Service Stopped and Disabled">> $logPath
 
-    $s22 = Get-Service -Name "XblAuthManager"
-    Stop-Service -InputObject $s22  -Force
-    Set-Service XblAuthManager -StartupType Disabled
-    " Xbox Live Auth Manager Stopped and Disabled">> $logPath
+        $s21 = Get-Service -Name "WSearch"
+        Stop-Service -InputObject $s21  -Force
+        Set-Service WSearch -StartupType Disabled
+        " Windows Search Stopped and Disabled">> $logPath
 
-    $s23 = Get-Service -Name "XblGameSave"
-    Stop-Service -InputObject $s23  -Force
-    Set-Service XblGameSave -StartupType Disabled
-    " Xbox Live Game Save Service Stopped and Disabled" >> $logPath
+        $s22 = Get-Service -Name "XblAuthManager"
+        Stop-Service -InputObject $s22  -Force
+        Set-Service XblAuthManager -StartupType Disabled
+        " Xbox Live Auth Manager Stopped and Disabled">> $logPath
 
-    $s24 = Get-Service -Name "XboxNetApiSvc"
-    Stop-Service -InputObject $s24  -Force
-    Set-Service XboxNetApiSvc -StartupType Disabled
-    " Xbox Live Networking Service Stopped and Disabled" >> $logPath
+        $s23 = Get-Service -Name "XblGameSave"
+        Stop-Service -InputObject $s23  -Force
+        Set-Service XblGameSave -StartupType Disabled
+        " Xbox Live Game Save Service Stopped and Disabled" >> $logPath
 
-    $s25 = Get-Service -Name "HomeGroupListener"
-    Stop-Service -InputObject $s25  -Force
-    Set-Service HomeGroupListener -StartupType Disabled
-    " HomeGroup Listener Stopped and Disabled" >> $logPath
+        $s24 = Get-Service -Name "XboxNetApiSvc"
+        Stop-Service -InputObject $s24  -Force
+        Set-Service XboxNetApiSvc -StartupType Disabled
+        " Xbox Live Networking Service Stopped and Disabled" >> $logPath
 
-    $s26 = Get-Service -Name "HomeGroupProvider"
-    Stop-Service -InputObject $s26  -Force
-    Set-Service HomeGroupProvider -StartupType Disabled
-    " HomeGroup Provider Stopped and Disabled" >> $logPath
+        $s25 = Get-Service -Name "HomeGroupListener"
+        Stop-Service -InputObject $s25  -Force
+        Set-Service HomeGroupListener -StartupType Disabled
+        " HomeGroup Listener Stopped and Disabled" >> $logPath
 
-    $s27 = Get-Service -Name "bthserv"
-    Stop-Service -InputObject $s27  -Force
-    Set-Service bthserv -StartupType Disabled
-    " Bluetooth Support Service Stopped and Disabled" >> $logPath
+        $s26 = Get-Service -Name "HomeGroupProvider"
+        Stop-Service -InputObject $s26  -Force
+        Set-Service HomeGroupProvider -StartupType Disabled
+        " HomeGroup Provider Stopped and Disabled" >> $logPath
 
-    $s28 = Get-Service -Name "WinHttpAutoProxySvc"
-    Stop-Service -InputObject $s28  -Force
-    Set-Service WinHttpAutoProxySvc -StartupType Disabled
-    " WinHTTP Web Proxy Auto-Discovery Stopped and Disabled" >> $logPath
+        $s27 = Get-Service -Name "bthserv"
+        Stop-Service -InputObject $s27  -Force
+        Set-Service bthserv -StartupType Disabled
+        " Bluetooth Support Service Stopped and Disabled" >> $logPath
 
-    #  $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Continue
+        $s28 = Get-Service -Name "WinHttpAutoProxySvc"
+        Stop-Service -InputObject $s28  -Force
+        Set-Service WinHttpAutoProxySvc -StartupType Disabled
+        " WinHTTP Web Proxy Auto-Discovery Stopped and Disabled" >> $logPath
 
+        #  $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Continue
+
+    }
 }

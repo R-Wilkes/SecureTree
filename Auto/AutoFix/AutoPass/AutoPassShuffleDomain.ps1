@@ -58,7 +58,7 @@ function Start-ADPassShuffle {
     #                     "NT SERVICE\*", "SERVICE", "SYSTEM", "TERMINAL SERVER USER", "THIS ORGANIZATION",
     #                     "USERS", "WORLD"
 
-    $doNotTouchUsers = Get-Content $doNotTouchUsersPath -ErrorAction SilentlyContinue
+    $doNotTouchUsers = Get-Content $doNotTouchUsersPath
     foreach ($user in $doNotTouchUsers){
         $usersToNotChange += $user.trim()
     }

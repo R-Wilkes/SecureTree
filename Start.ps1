@@ -75,7 +75,24 @@ function RunAuto(){
     
     # Runs the fix script
     if ((Config("run_auto_fix"))){
+
         & ./Auto/AutoFix/AutoFix.ps1
+
+        # Opens new terminal for logging monitoring, only on the Domain Controller
+        # It runs after autofix so all the users are set first
+        if ((IsDC)){
+
+            "`nStarted Accounts Log Monitoring" >> $logPath
+
+            # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
+            Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoDiagnostics\Monitoring\LoginMonitor.ps1"
+
+            "`nStarted SystemChange Log Monitoring" >> $logPath
+
+            # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
+            Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoDiagnostics\Monitoring\SystemChangeMonitor.ps1"
+
+        }
     }
 }
 
@@ -86,7 +103,7 @@ $global:creator = "Ricker Wilkes"
 $global:creator | Out-Null
 
 # Version = MainVersion.SubVersion.PatchVersion
-$global:version = "1.0"
+$global:version = "1.1"
 $global:version | Out-Null
 
 # Gets current User
@@ -1660,6 +1677,11 @@ else{
             Write-Host "Locations of desktop shortcut paths, make sure they actually go to the correct location!"
             Write-Host "%windir%\System32\WindowsPowerShell\v1.0\powershell.exe - For Powershell"
             Write-Host "explorer.exe shell:::{2559a1f3-21d7-11d4-bdaf-00c04f60b9f0} - For Run dialog box"
+            Write-Host "`n `n"
+            Write-Host "Reminder of some GPO policys to apply to the domain"
+            Write-Host "Network access: Do not allow storage of passwords and credentials for network authentication"
+            Write-Host "User Account Control: Admin Approval Mode for the Built-in Administrator account"
+            Write-Host "User Account Control: Behavior of the elevation prompt for administrators in Admin Approval Mode"
             Write-Host "`n"
             Write-Host "Also have to make sure your in the correct group on the local machine"
             Write-Host "net localgroup administrators 'JJM\Domain Admins' /add"
