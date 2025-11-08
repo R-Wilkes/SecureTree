@@ -2472,7 +2472,7 @@ else{
                 
                 While ($true){
                 
-                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Wallpaper Settings `n 3) Terminals `n 4) Remote Commands `n 5) Exit")
+                    $choice = BuildSubOptionFrame(" 1) Invoke GPO update `n 2) Wallpaper Settings `n 3) Terminals `n 4) Remote Commands `n 5) Add GPO Perms `n 6) Exit")
                     
                     # invoke GPO update on selected computers | AI
                     if ($choice -eq "1"){
@@ -3401,8 +3401,90 @@ else{
                         }
                     }
 
-                    # Exits
+                    # Adds current user to ALL GPO to be able to edit them | AI
                     elseif ($choice -eq "5"){
+                        
+                        if ((2FA -Message "Are you sure you want to add edit permissions to ALL GPOs?")) {
+
+                            try {
+                                # Get current user
+                                $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+                                $currentUserName = $currentUser.Name
+                                
+                                Write-Host "Current User: $currentUserName" -ForegroundColor Cyan
+                                "`nAdding $currentUserName to all GPOs" >> $manPath
+
+                                # Get all GPOs
+                                $allGPOs = Get-GPO -All
+                                
+                                Write-Host "Found $($allGPOs.Count) GPOs to modify" -ForegroundColor White
+                                
+                                $successCount = 0
+                                $errorCount = 0
+                                $skippedCount = 0
+
+                                foreach ($gpo in $allGPOs) {
+                                    
+                                    Write-Host "Processing: $($gpo.DisplayName)" -ForegroundColor Cyan
+                                    
+                                    try {
+                                        # Check if user already has permissions
+                                        $existingPermissions = Get-GPPermission -Guid $gpo.Id -All -ErrorAction SilentlyContinue | 
+                                                            Where-Object { $_.Trustee.Name -eq $currentUserName }
+                                        
+                                        if ($existingPermissions) {
+                                            Write-Host "  Already has permissions - skipping" -ForegroundColor Yellow
+                                            $skippedCount++
+                                            "`n  $($gpo.DisplayName) - Already has permissions" >> $manLog
+                                            continue
+                                        }
+
+                                        # Add edit permissions
+                                        Set-GPPermission -Guid $gpo.Id -TargetName $currentUserName -TargetType User -PermissionLevel GpoEditDeleteModifySecurity -ErrorAction Stop
+                                        
+                                        Write-Host "  Added edit permissions" -ForegroundColor Green
+                                        $successCount++
+                                        "`n  $($gpo.DisplayName) - Edit permissions added" >> $manLog
+
+                                    } catch {
+                                        Write-Host "  ERROR: $($_.Exception.Message)" -ForegroundColor Red
+                                        $errorCount++
+                                        "`n  $($gpo.DisplayName) - ERROR: $($_.Exception.Message)" >> $manLog
+                                    }
+                                }
+
+                                # Summary
+                                Write-Host "`n=== SUMMARY ===" -ForegroundColor Magenta
+                                Write-Host "Total GPOs: $($allGPOs.Count)" -ForegroundColor White
+                                Write-Host "Successfully added: $successCount" -ForegroundColor Green
+                                Write-Host "Already had permissions: $skippedCount" -ForegroundColor Yellow
+                                Write-Host "Errors: $errorCount" -ForegroundColor Red
+
+                                "`n=== SUMMARY ===" >> $manLog
+                                "`nTotal: $($allGPOs.Count), Added: $successCount, Skipped: $skippedCount, Errors: $errorCount" >> $manLog
+
+                                if ($successCount -gt 0) {
+                                    Write-Host "`nUser $currentUserName now has edit access to $successCount GPOs" -ForegroundColor Green
+                                }
+
+                            } catch {
+                                Write-Host "Failed to modify GPO permissions: $($_.Exception.Message)" -ForegroundColor Red
+                                "`nFailed to modify GPO permissions: $($_.Exception.Message)" >> $manLog
+                            }
+
+                            Write-Host "Press Enter to continue"
+                            GetKeyInput -AllowedKeys "`r" -Return $false
+
+                        } 
+                        
+                        else {
+                            Write-Host "Operation cancelled" -ForegroundColor Yellow
+                            "`nGPO permission modification cancelled by user" >> $manLog
+                        }
+                    }
+
+                    # Exits
+                    elseif ($choice -eq "6"){
                         "[" + (Get-CurrentTime) + "] $curuser Exited DC GPO Menu" >> $manLog
                         break
                     }
