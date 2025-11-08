@@ -65,7 +65,7 @@ function Start-ADPassShuffle {
 
     $basePassword = Get-Content "./UserLists/Pass_Shuffle.txt" -ErrorAction SilentlyContinue
     if (-not $basePassword -or $basePassword.Length -eq 0){
-        $basePassword = "TempPass1234!"
+        $basePassword = "ChangeMe42069"
     }
 
     # Initialize counter

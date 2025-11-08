@@ -231,9 +231,10 @@ if (-not (IsDC)){
     }
 }
 
-# Will set domain users based on the list provided | AI
-if ((IsDC)){
+# Things to run if on a Domain Controller
+if (IsDC){
 
+    # Will set domain users based on the list provided | AI
     if (Config("set_domain_users")){
 
         Write-Host "Setting domain Users..."
@@ -469,11 +470,8 @@ if ((IsDC)){
         "`n<--------------------------------------------->`nEnd Domain User Changes" >> $logPath
 
     }
-}
 
-# Will fix Local users on remote machines connected to the domain | AI
-if (IsDC){
-
+    # Will fix Local users on remote machines connected to the domain | AI
     if ((Config("set_remote_users"))){
         
         Write-Host "Fixing local users on remote domain machines..." -ForegroundColor Red
@@ -746,19 +744,18 @@ if (IsDC){
 
         "`n<--------------------------------------------->`nEnd Remote Machine Local Users Fixing" >> $logPath
     }
-}
 
-# Runs the password shuffle
-if ((Config("password_shuffle"))){
+    # Runs the password shuffle
+    if ((Config("password_shuffle"))){
 
-    "`nStarted Password shuffle" >> $logPath
+        "`nStarted Password shuffle" >> $logPath
 
-    # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
-    Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffle.ps1"
+        # Starts a new process, not gonna import the 500 lins script for easy handing of Jobs
+        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffle.ps1"
 
-    Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffleDomain.ps1"
+        Start-Process powershell -ArgumentList "-NoExit", "-File", ".\Auto\AutoFix\AutoPass\AutoPassShuffleDomain.ps1"
 
-
+    }
 }
 
 # Enables all of the firewall rules I have stolen

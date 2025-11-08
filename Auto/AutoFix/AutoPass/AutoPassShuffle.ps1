@@ -66,7 +66,7 @@ function Start-PassShuffle {
     $basePassword = Get-Content "./UserLists/Pass_Shuffle.txt"
 
     if ($basePassword.Length() -eq 0){
-        $basePassword = "TempPass1234!"
+        $basePassword = "ChangeMe42069"
     }
 
     # Initialize counter
@@ -199,9 +199,8 @@ function Start-PassShuffle {
         Write-Host "`nCycle $($cycleCount-1) completed. Waiting before next cycle..." -ForegroundColor Green
         "`nCycle $($cycleCount-1) completed at $(Get-Date)" >> $logPath
         
-        # Wait between cycles (configurable)
-        $cycleDelay = Config("password_cycle_delay")
-        if (-not $cycleDelay) { $cycleDelay = 10 }  # Default 5 minutes
+    
+       $cycleDelay = 15
         
         Write-Host "Waiting $cycleDelay seconds before next cycle..." -ForegroundColor Cyan
         Start-Sleep $cycleDelay

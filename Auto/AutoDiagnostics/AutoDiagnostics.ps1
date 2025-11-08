@@ -507,6 +507,196 @@ if ((IsDC)){
 
 }
 
+# Check Domain Policy Edit Permissions and Display GPOs | AI
+if ((IsDC)) {
+
+    Write-Host "`n`nChecking Domain Policy Permissions and GPOs..." -ForegroundColor Yellow
+    "`nDomain Policy Permissions and GPO Check `n<--------------------------------------------->" >> $logPath
+
+    try {
+        # Get domain information
+        $domain = Get-ADDomain
+        # $domainDN = $domain.DistinguishedName
+        $domainName = $domain.Name
+        
+        Write-Host "Domain: $domainName" -ForegroundColor Cyan
+        "`nDomain: $domainName" >> $logPath
+
+        # Get current user's identity and groups
+        $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $currentUserSID = $currentUser.User.Value
+        $currentUserName = $currentUser.Name
+        
+        Write-Host "Current User: $currentUserName ($currentUserSID)" -ForegroundColor White
+        "`nCurrent User: $currentUserName ($currentUserSID)" >> $logPath
+
+        # Check if user is in key admin groups
+        $userGroups = @()
+        $currentUser.Groups | ForEach-Object {
+            try {
+                $group = $_.Translate([System.Security.Principal.NTAccount]).Value
+                $userGroups += $group
+            } catch {}
+        }
+
+        $adminGroups = @("Domain Admins", "Enterprise Admins", "Group Policy Creator Owners", "Administrators")
+        $userAdminGroups = $userGroups | Where-Object { 
+            $adminGroups | ForEach-Object { if ($_ -and $userGroups -match $_) { return $true } }
+        }
+
+        if ($userAdminGroups) {
+            Write-Host "Admin Groups: $($userAdminGroups -join ', ')" -ForegroundColor Green
+        } else {
+            Write-Host "Admin Groups: None detected" -ForegroundColor Red
+        }
+
+        # Get all domain GPOs
+        Write-Host "`n=== ALL DOMAIN GPOS ===" -ForegroundColor Magenta
+        "`n=== ALL DOMAIN GPOS ===" >> $logPath
+
+        $allGPOs = Get-GPO -All | Sort-Object DisplayName
+        
+        Write-Host "Total GPOs in domain: $($allGPOs.Count)" -ForegroundColor White
+        "`nTotal GPOs in domain: $($allGPOs.Count)" >> $logPath
+
+        foreach ($gpo in $allGPOs) {
+            $gpoColor = "White"
+            $gpoNote = ""
+            
+            # Highlight important default policies
+            if ($gpo.DisplayName -eq "Default Domain Policy") {
+                $gpoColor = "Yellow"
+                $gpoNote = " [DEFAULT DOMAIN POLICY]"
+            } elseif ($gpo.DisplayName -eq "Default Domain Controllers Policy") {
+                $gpoColor = "Cyan"
+                $gpoNote = " [DEFAULT DC POLICY]"
+            } elseif ($gpo.GpoStatus -eq "UserSettingsDisabled" -or $gpo.GpoStatus -eq "ComputerSettingsDisabled") {
+                $gpoColor = "Gray"
+                $gpoNote = " [PARTIALLY DISABLED]"
+            } elseif ($gpo.GpoStatus -eq "AllSettingsDisabled") {
+                $gpoColor = "Red"
+                $gpoNote = " [DISABLED]"
+            }
+
+            Write-Host "  $($gpo.DisplayName)$gpoNote" -ForegroundColor $gpoColor
+            Write-Host "    ID: $($gpo.Id)" -ForegroundColor Gray
+            Write-Host "    Status: $($gpo.GpoStatus)" -ForegroundColor Gray
+            Write-Host "    Created: $($gpo.CreationTime)" -ForegroundColor Gray
+            Write-Host "    Modified: $($gpo.ModificationTime)" -ForegroundColor Gray
+            
+            "`n  GPO: $($gpo.DisplayName)$gpoNote" >> $logPath
+            "`n    ID: $($gpo.Id), Status: $($gpo.GpoStatus)" >> $logPath
+        }
+
+        # Check permissions on default domain policies
+        Write-Host "`n=== DEFAULT POLICY PERMISSIONS ===" -ForegroundColor Magenta
+        "`n=== DEFAULT POLICY PERMISSIONS ===" >> $logPath
+
+        $defaultPolicies = @(
+            @{ Name = "Default Domain Policy"; DisplayName = "Default Domain Policy" },
+            @{ Name = "Default Domain Controllers Policy"; DisplayName = "Default Domain Controllers Policy" }
+        )
+
+        foreach ($policy in $defaultPolicies) {
+            try {
+                $gpo = Get-GPO -Name $policy.DisplayName -ErrorAction Stop
+                
+                Write-Host "`nChecking: $($policy.DisplayName)" -ForegroundColor Yellow
+                "`nChecking: $($policy.DisplayName)" >> $logPath
+
+                # Get GPO permissions
+                $gpoPermissions = Get-GPPermission -Guid $gpo.Id -All -ErrorAction Stop
+                
+                # Check if current user has edit permissions
+                $hasEditPermission = $false
+                $userPermissions = @()
+
+                foreach ($permission in $gpoPermissions) {
+                    # Check direct user permissions
+                    if ($permission.Trustee.Sid -eq $currentUserSID) {
+                        $userPermissions += "$($permission.Permission) (Direct)"
+                        if ($permission.Permission -match "Edit|FullControl") {
+                            $hasEditPermission = $true
+                        }
+                    }
+                    
+                    # Check group permissions
+                    foreach ($userGroup in $userGroups) {
+                        if ($permission.Trustee.Name -eq $userGroup -or $permission.Trustee.Name -like "*$($userGroup.Split('\')[-1])") {
+                            $userPermissions += "$($permission.Permission) (via $($permission.Trustee.Name))"
+                            if ($permission.Permission -match "Edit|FullControl") {
+                                $hasEditPermission = $true
+                            }
+                        }
+                    }
+                }
+
+                # Display results
+                if ($hasEditPermission) {
+                    Write-Host "  EDIT PERMISSION: YES" -ForegroundColor Green
+                    "`n  EDIT PERMISSION: YES" >> $logPath
+                } else {
+                    Write-Host "  EDIT PERMISSION: NO" -ForegroundColor Red
+                    "`n  EDIT PERMISSION: NO" >> $logPath
+                }
+
+                if ($userPermissions.Count -gt 0) {
+                    Write-Host "  User Permissions: $($userPermissions -join ', ')" -ForegroundColor Cyan
+                    "`n  User Permissions: $($userPermissions -join ', ')" >> $logPath
+                } else {
+                    Write-Host "  User Permissions: None detected" -ForegroundColor Red
+                    "`n  User Permissions: None detected" >> $logPath
+                }
+
+                # Show all permissions for reference
+                Write-Host "  All Permissions on this GPO:" -ForegroundColor Gray
+                foreach ($perm in $gpoPermissions) {
+                    Write-Host "    $($perm.Trustee.Name): $($perm.Permission)" -ForegroundColor Gray
+                    "`n    $($perm.Trustee.Name): $($perm.Permission)" >> $logPath
+                }
+
+            } catch {
+                Write-Host "  ERROR checking $($policy.DisplayName): $($_.Exception.Message)" -ForegroundColor Red
+                "`n  ERROR checking $($policy.DisplayName): $($_.Exception.Message)" >> $logPath
+            }
+        }
+
+        # Quick security check
+        Write-Host "`n=== SECURITY SUMMARY ===" -ForegroundColor Magenta
+        "`n=== SECURITY SUMMARY ===" >> $logPath
+
+        $securityIssues = @()
+
+        # Check for disabled GPOs
+        $disabledGPOs = $allGPOs | Where-Object { $_.GpoStatus -eq "AllSettingsDisabled" }
+        if ($disabledGPOs) {
+            $securityIssues += "Found $($disabledGPOs.Count) completely disabled GPOs"
+            Write-Host "WARNING: $($disabledGPOs.Count) GPOs are completely disabled" -ForegroundColor Yellow
+        }
+
+        # Check for old GPOs
+        $oldGPOs = $allGPOs | Where-Object { $_.ModificationTime -lt (Get-Date).AddMonths(-6) }
+        if ($oldGPOs) {
+            $securityIssues += "Found $($oldGPOs.Count) GPOs not modified in 6+ months"
+            Write-Host "INFO: $($oldGPOs.Count) GPOs haven't been modified in 6+ months" -ForegroundColor Cyan
+        }
+
+        if ($securityIssues.Count -eq 0) {
+            Write-Host "No obvious GPO security issues detected" -ForegroundColor Green
+            "`nNo obvious GPO security issues detected" >> $logPath
+        } else {
+            "`nSecurity Issues: $($securityIssues -join '; ')" >> $logPath
+        }
+
+        "`n<--------------------------------------------->`nEnd Domain Policy Check" >> $logPath
+
+    } catch {
+        Write-Host "Failed to check domain policies: $($_.Exception.Message)" -ForegroundColor Red
+        "`nFailed to check domain policies: $($_.Exception.Message)" >> $logPath
+    }
+
+}
+
 # Shows all programs on PC
 Get-Package -Provider Programs
 Get-WmiObject -Class Win32_Product | Select-Object -Property Name

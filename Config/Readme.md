@@ -9,6 +9,7 @@
 - Entering an incorrect config setting will cause the script to crash <br>
 - 'Ask' can be used for all the settings if you want, but its only useful on the setting specified <br>
 - Any Value that has a '*' next to it is changeable while the script is running (Can do it realistically for all values, not recommended)<br>
+- Any settings that has "Must be on DC" next to it means you must be on a Domain Controller for it to even run.
 
 ## Quality of Life settings
 
@@ -68,11 +69,11 @@ Can horrificly mess up your machine if you enable things that should not be enab
 - Sets local users based on the users defined in the local_admins/users files <br>
 - WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
 
-### set_domain_users (True, False, Ask)
+### set_domain_users (True, False, Ask) Must be on DC
 - Sets domain users based on the users defined in the domain admins/users files <br>
 - WARNING: Won't mess with your current user, but can very easily mess up the scoring system user <br>
 
-### set_remote_users (True, False, Ask)
+### set_remote_users (True, False, Ask) Must be on DC
 - Sets local users on other machines based on the Local users/admins files <br>
 - WARNING: Can be horrific if stopped mid way, cause ya know, its editing other users on other MACHINES <br>
 
@@ -84,7 +85,7 @@ Can horrificly mess up your machine if you enable things that should not be enab
 - Will set a lot of services either on or off <br>
 - WARNING: Disables RDP so could brick you if thats what your using to access
 
-### password_shuffle (True, False, Ask)
+### password_shuffle (True, False, Ask) Must be on DC
 - Automatically sets remote local users passwords constantly <br>
 - Hopefully delays red team <br>
 
