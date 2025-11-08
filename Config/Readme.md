@@ -84,14 +84,6 @@ Can horrificly mess up your machine if you enable things that should not be enab
 - Will set a lot of services either on or off <br>
 - WARNING: Disables RDP so could brick you if thats what your using to access
 
-### set_registry_keys (True, False, Ask)
-- Sets a bunch of keys a took from somewhere, so could be very bad <br>
-
-### run_Policys (True, False, Ask)
-- Sets a lot of policys that are generally for security <br>
-- Will only run if Auto Fix is true <br>
-- WARNING: This will break your computer somewhere, go for it anyway <br>
-
 ### password_shuffle (True, False, Ask)
 - Automatically sets remote local users passwords constantly <br>
 - Hopefully delays red team <br>
