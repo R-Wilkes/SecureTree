@@ -492,6 +492,252 @@ if ($true){
 
 }
 
+# Check for Non-Default Firewall Rules | AI
+if ($true){
+
+    Write-Host "Checking for non-default firewall rules..." -ForegroundColor Yellow
+
+    try {
+        # Get all firewall rules
+        $allRules = Get-NetFirewallRule | Sort-Object DisplayName
+        
+        # Define default Windows firewall rule patterns (common built-in rules)
+        $defaultRulePatterns = @(
+            "^Core Networking",
+            "^Windows",
+            "^File and Printer Sharing",
+            "^Network Discovery",
+            "^Remote Desktop",
+            "^Windows Management Instrumentation",
+            "^Windows Remote Management",
+            "^SNMP",
+            "^Performance Logs and Alerts",
+            "^Remote Event Log Management",
+            "^Remote Service Management",
+            "^Remote Volume Management",
+            "^Windows Firewall Remote Management",
+            "^Hyper-V",
+            "^iSCSI",
+            "^BranchCache",
+            "^DirectAccess",
+            "^Distributed File System",
+            "^Key Management Service",
+            "^Remote Assistance",
+            "^Windows Media Player",
+            "^BITS",
+            "^Telnet",
+            "^FTP",
+            "^Microsoft",
+            "^@",
+            "^Cast to Device",
+            
+            # Active Directory Domain Services
+            "^Active Directory Domain Controller",
+            "^Active Directory Web Services",
+            "^Kerberos Key Distribution Center",
+            "^File Replication",
+            "^DFS",
+            "^Netlogon Service",
+            
+            # DNS Server
+            "^DNS",
+            "^All Outgoing",
+            "^RPC.*Incoming",
+            "^RPC Endpoint Mapper",
+            
+            # Network Services
+            "^AllJoyn Router",
+            "^mDNS",
+            "^Delivery Optimization",
+            "^Connected User Experiences and Telemetry",
+            
+            # Remote Management
+            "^File Server Remote Management",
+            "^Remote Event Monitor",
+            "^Remote Scheduled Tasks Management",
+            "^Inbound Rule for Remote Shutdown",
+            
+            # VPN/Routing
+            "^Routing and Remote Access",
+            "^Secure Socket Tunneling Protocol",
+            
+            # System Services
+            "^COM\+ Network Access",
+            "^COM\+ Remote Administration",
+            "^Distributed Transaction Coordinator",
+            "^Software Load Balancer Multiplexer",
+            "^TPM Virtual Smart Card Management",
+            "^Virtual Machine Monitoring",
+            
+            # Windows Apps/Features
+            "^DIAL protocol server",
+            "^Desktop App Web Viewer",
+            "^Captive Portal Flow",
+            "^Email and accounts",
+            "^Work or school account",
+            "^Your account",
+            "^Start",
+            "^Narrator",
+            
+            # GUID-based rules (Windows Store/UWP apps)
+            "^\{[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}\}$"
+        )
+
+        # Filter out default rules
+        $customRules = $allRules | Where-Object {
+            $ruleName = $_.DisplayName
+            $isDefault = $false
+            
+            foreach ($pattern in $defaultRulePatterns) {
+                if ($ruleName -match $pattern) {
+                    $isDefault = $true
+                    break
+                }
+            }
+            
+            return -not $isDefault
+        }
+
+        Write-Host "`n=== FIREWALL RULE SUMMARY ===" -ForegroundColor Magenta
+        Write-Host "Total Rules: $($allRules.Count)" -ForegroundColor White
+        Write-Host "Custom/Non-Default Rules: $($customRules.Count)" -ForegroundColor Yellow
+        
+        "`n=== FIREWALL RULE SUMMARY ===" >> $logPath
+        "`nTotal Rules: $($allRules.Count)" >> $logPath
+        "`nCustom/Non-Default Rules: $($customRules.Count)" >> $logPath
+
+        if ($customRules.Count -gt 0) {
+            
+            Write-Host "`n=== NON-DEFAULT FIREWALL RULES ===" -ForegroundColor Red
+            "`n=== NON-DEFAULT FIREWALL RULES ===" >> $logPath
+            
+            foreach ($rule in $customRules) {
+                
+                # Get additional rule details
+                try {
+                    $ruleDetails = Get-NetFirewallRule -Name $rule.Name | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
+                    $addressFilter = Get-NetFirewallRule -Name $rule.Name | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
+                    $appFilter = Get-NetFirewallRule -Name $rule.Name | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
+                } catch {
+                    $ruleDetails = $null
+                    $addressFilter = $null
+                    $appFilter = $null
+                }
+
+                # Determine suspicion level
+                $suspiciousFlags = @()
+                
+                if ($rule.Action -eq "Allow" -and $rule.Direction -eq "Inbound") {
+                    $suspiciousFlags += "INBOUND_ALLOW"
+                }
+                if ($ruleDetails -and ($ruleDetails.LocalPort -eq "Any" -or $ruleDetails.RemotePort -eq "Any")) {
+                    $suspiciousFlags += "ANY_PORT"
+                }
+                if ($addressFilter -and ($addressFilter.RemoteAddress -eq "Any" -or $addressFilter.RemoteAddress -eq "0.0.0.0/0")) {
+                    $suspiciousFlags += "ANY_ADDRESS"
+                }
+                if ($appFilter -and $appFilter.Program -like "*temp*") {
+                    $suspiciousFlags += "TEMP_PROGRAM"
+                }
+                if ($rule.DisplayName -match "bypass|hack|backdoor|shell|rat|trojan") {
+                    $suspiciousFlags += "SUSPICIOUS_NAME"
+                }
+
+                # Color coding based on suspicion
+                $ruleColor = "White"
+                if ($suspiciousFlags.Count -gt 0) {
+                    $ruleColor = "Red"
+                } elseif ($rule.Action -eq "Allow" -and $rule.Direction -eq "Inbound") {
+                    $ruleColor = "Yellow"
+                }
+
+                Write-Host "`nRule: $($rule.DisplayName)" -ForegroundColor $ruleColor
+                Write-Host "  Name: $($rule.Name)" -ForegroundColor Gray
+                Write-Host "  Action: $($rule.Action)" -ForegroundColor $(if($rule.Action -eq "Allow"){"Green"}else{"Red"})
+                Write-Host "  Direction: $($rule.Direction)" -ForegroundColor Gray
+                Write-Host "  Enabled: $($rule.Enabled)" -ForegroundColor $(if($rule.Enabled -eq "True"){"Green"}else{"Gray"})
+                Write-Host "  Profile: $($rule.Profile)" -ForegroundColor Gray
+                
+                if ($ruleDetails) {
+                    Write-Host "  Local Port: $($ruleDetails.LocalPort)" -ForegroundColor Gray
+                    Write-Host "  Remote Port: $($ruleDetails.RemotePort)" -ForegroundColor Gray
+                    Write-Host "  Protocol: $($ruleDetails.Protocol)" -ForegroundColor Gray
+                }
+                
+                if ($addressFilter) {
+                    Write-Host "  Remote Address: $($addressFilter.RemoteAddress)" -ForegroundColor Gray
+                    Write-Host "  Local Address: $($addressFilter.LocalAddress)" -ForegroundColor Gray
+                }
+                
+                if ($appFilter -and $appFilter.Program -ne "Any") {
+                    Write-Host "  Program: $($appFilter.Program)" -ForegroundColor Gray
+                }
+                
+                if ($suspiciousFlags.Count -gt 0) {
+                    Write-Host "  SUSPICIOUS: $($suspiciousFlags -join ', ')" -ForegroundColor Red
+                }
+
+                # Log to file
+                "`nCustom Rule: $($rule.DisplayName)" >> $logPath
+                "`n  Action: $($rule.Action), Direction: $($rule.Direction), Enabled: $($rule.Enabled)" >> $logPath
+                if ($ruleDetails) {
+                    "`n  Ports: Local=$($ruleDetails.LocalPort), Remote=$($ruleDetails.RemotePort), Protocol=$($ruleDetails.Protocol)" >> $logPath
+                }
+                if ($addressFilter) {
+                    "`n  Addresses: Local=$($addressFilter.LocalAddress), Remote=$($addressFilter.RemoteAddress)" >> $logPath
+                }
+                if ($appFilter -and $appFilter.Program -ne "Any") {
+                    "`n  Program: $($appFilter.Program)" >> $logPath
+                }
+                if ($suspiciousFlags.Count -gt 0) {
+                    "`n  SUSPICIOUS: $($suspiciousFlags -join ', ')" >> $logPath
+                }
+            }
+
+            # Security summary
+            $allowInboundRules = $customRules | Where-Object { $_.Action -eq "Allow" -and $_.Direction -eq "Inbound" -and $_.Enabled -eq "True" }
+            $suspiciousRules = $customRules | Where-Object { 
+                $_.DisplayName -match "bypass|hack|backdoor|shell|rat|trojan" -or
+                $_.Action -eq "Allow" -and $_.Direction -eq "Inbound" -and $_.Profile -eq "Public"
+            }
+
+            Write-Host "`n=== SECURITY ANALYSIS ===" -ForegroundColor Magenta
+            Write-Host "Custom Inbound Allow Rules: $($allowInboundRules.Count)" -ForegroundColor $(if($allowInboundRules.Count -gt 0){"Yellow"}else{"Green"})
+            Write-Host "Potentially Suspicious Rules: $($suspiciousRules.Count)" -ForegroundColor $(if($suspiciousRules.Count -gt 0){"Red"}else{"Green"})
+
+            "`n=== SECURITY ANALYSIS ===" >> $logPath
+            "`nCustom Inbound Allow Rules: $($allowInboundRules.Count)" >> $logPath
+            "`nPotentially Suspicious Rules: $($suspiciousRules.Count)" >> $logPath
+
+            if ($allowInboundRules.Count -gt 0) {
+                Write-Host "`nWARNING: Found custom inbound allow rules - review for security" -ForegroundColor Yellow
+            }
+
+        } else {
+            Write-Host "`nNo custom firewall rules detected - all rules appear to be default Windows rules" -ForegroundColor Green
+            "`nNo custom firewall rules detected" >> $logPath
+        }
+
+        # Quick stats by profile
+        $domainRules = $allRules | Where-Object { $_.Profile -match "Domain" }
+        $privateRules = $allRules | Where-Object { $_.Profile -match "Private" }  
+        $publicRules = $allRules | Where-Object { $_.Profile -match "Public" }
+
+        Write-Host "`n=== RULES BY PROFILE ===" -ForegroundColor Magenta
+        Write-Host "Domain: $($domainRules.Count)" -ForegroundColor Green
+        Write-Host "Private: $($privateRules.Count)" -ForegroundColor Yellow
+        Write-Host "Public: $($publicRules.Count)" -ForegroundColor Red
+
+        "`n=== RULES BY PROFILE ===" >> $logPath
+        "`nDomain: $($domainRules.Count), Private: $($privateRules.Count), Public: $($publicRules.Count)" >> $logPath
+
+    } catch {
+        Write-Host "Failed to check firewall rules: $($_.Exception.Message)" -ForegroundColor Red
+        "`nFailed to check firewall rules: $($_.Exception.Message)" >> $logPath
+    }
+
+}
+
 # Opens new terminal for logging monitoring, only on the Domain Controller
 if ((IsDC)){
 
