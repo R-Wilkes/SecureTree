@@ -6,9 +6,6 @@
 # Master Repository: https://github.com/R-Wilkes/SecureTree
 # ---------------------------
 
-# NOTE: the | AI at top of code and such means that AI was used to create it
-# NOTE: Not like Fully copy paste, I still edit it to my liking and such
-
 # This sets your path to the script root, so you can run it from anywhere
 Set-Location -Path "$PSScriptRoot"
 

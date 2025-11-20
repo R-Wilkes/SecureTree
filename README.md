@@ -1,9 +1,7 @@
 # SecureTree Info
 
 - SecureTree is meant to be useful in the IRSec competitions
-- Its the daughter of the Cyberpatriot Script (Hopefully the successor)
-
-- THIS REPO WILL BE PUBLIC ONLY DURING THE COMPETITION, AND WILL BECOME PRIVATE WHEN NOT DOING COMP
+- It provides a bunch of simple tools/features that make securing windows automated and or easier
 
 # IRSec
 - Its a blue teaming competitions, slightly to Cyberpatriot
@@ -53,7 +51,7 @@ Information on what the settings do in the config can be found [Here](Config/Rea
 
 # Passwords
 
-Passwords are can be defined in this script, but will most likely be change when in comp <br>
+Passwords are defined in this script, but will most likely change when in comp <br>
 
 NOTE: Your not gonna find the passwords in this script, the passwords can be found [Here](https://www.youtube.com/watch?v=dQw4w9WgXcQ)  <br>
 
