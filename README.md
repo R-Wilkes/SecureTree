@@ -1,14 +1,7 @@
 # SecureTree Info
 
-- SecureTree is meant to be useful in the IRSec competitions
+- SecureTree is meant to be useful in the IRSec/Blue teaming competitions
 - It provides a bunch of simple tools/features that make securing windows automated and or easier
-
-# IRSec
-- Its a blue teaming competitions, slightly to Cyberpatriot
-- Difference being Red team has full control of all machines and will be breaking every single one
-- SecureTree can only really delay the effects of red team
-- Also have to wright injects and reports on what happens
-
 
 # Running the Start.ps1
 
